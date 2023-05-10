@@ -3,10 +3,11 @@ Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
 
-from data.base_dataset import BaseDataset, get_params, get_transform
+from data.base_dataset import BaseDataset, get_params, get_transform, convert_label_image
 from PIL import Image
 import util.util as util
 import os
+import numpy as np
 
 
 class Pix2pixDataset(BaseDataset):
@@ -57,10 +58,12 @@ class Pix2pixDataset(BaseDataset):
     def __getitem__(self, index):
         # Label Image
         label_path = self.label_paths[index]
-        label = Image.open(label_path)
+        label = Image.open(label_path).convert('L')
+        label = Image.fromarray(convert_label_image(np.array(label)))
         params = get_params(self.opt, label.size)
         transform_label = get_transform(self.opt, params, method=Image.NEAREST, normalize=False)
         label_tensor = transform_label(label) * 255.0
+        # label像素值为255的未知类别
         label_tensor[label_tensor == 255] = self.opt.label_nc  # 'unknown' is opt.label_nc
 
         # input image (real images)
@@ -73,6 +76,8 @@ class Pix2pixDataset(BaseDataset):
 
         transform_image = get_transform(self.opt, params)
         image_tensor = transform_image(image)
+        if self.opt.output_nc != image_tensor.size()[0]:
+            image_tensor = image_tensor[:self.opt.output_nc]
 
         # if using instance maps
         if self.opt.no_instance:

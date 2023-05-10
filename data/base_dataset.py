@@ -8,6 +8,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 import numpy as np
 import random
+import cv2
 
 
 class BaseDataset(data.Dataset):
@@ -126,3 +127,19 @@ def __flip(img, flip):
     if flip:
         return img.transpose(Image.FLIP_LEFT_RIGHT)
     return img
+
+
+def __extract_outloop(img):
+    contour, _ = cv2.findContours(cv2.threshold(img, 200, 1, cv2.THRESH_BINARY_INV)[1],
+                                               cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contour = np.array(contour).reshape(-1, 2).tolist()
+    return contour
+
+
+def convert_label_image(img):
+    outloop = __extract_outloop(img)
+    if outloop[-1] != outloop[0]:
+        outloop.append(outloop[-1])
+    img_label = np.ones_like(img, dtype=np.uint8) * 255
+    cv2.fillPoly(img_label, np.array([outloop], dtype=np.int32), (0, 0, 0))
+    return img_label

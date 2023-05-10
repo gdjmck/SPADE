@@ -29,6 +29,7 @@ class Pix2PixModel(torch.nn.Module):
             self.criterionGAN = networks.GANLoss(
                 opt.gan_mode, tensor=self.FloatTensor, opt=self.opt)
             self.criterionFeat = torch.nn.L1Loss()
+            self.criterionColor = torch.nn.MSELoss(reduction='none')
             if not opt.no_vgg_loss:
                 self.criterionVGG = networks.VGGLoss(self.opt.gpu_ids)
             if opt.use_vae:
@@ -108,6 +109,7 @@ class Pix2PixModel(torch.nn.Module):
     def preprocess_input(self, data):
         # move to GPU and change data types
         data['label'] = data['label'].long()
+        # data['label'][data['label'] != 1] = 0
         if self.use_gpu():
             data['label'] = data['label'].cuda()
             data['instance'] = data['instance'].cuda()
@@ -120,6 +122,7 @@ class Pix2PixModel(torch.nn.Module):
             else self.opt.label_nc
         input_label = self.FloatTensor(bs, nc, h, w).zero_()
         input_semantics = input_label.scatter_(1, label_map, 1.0)
+        # input_semantics = label_map.float()
 
         # concatenate instance map if it exists
         if not self.opt.no_instance:
@@ -141,6 +144,7 @@ class Pix2PixModel(torch.nn.Module):
         pred_fake, pred_real = self.discriminate(
             input_semantics, fake_image, real_image)
 
+        # maximize pred_fake
         G_losses['GAN'] = self.criterionGAN(pred_fake, True,
                                             for_discriminator=False)
 
@@ -158,7 +162,20 @@ class Pix2PixModel(torch.nn.Module):
 
         if not self.opt.no_vgg_loss:
             G_losses['VGG'] = self.criterionVGG(fake_image, real_image) \
-                * self.opt.lambda_vgg
+                              * self.opt.lambda_vgg
+
+        # 前景区域颜色区间化
+        if self.opt.color_raster:
+            fake_image_upper, fake_image_lower, fake_image_bias = util.COLOR.dicretize(fake_image)
+            mask_foreground = (1 - input_semantics[:, -1:, ...])
+            G_losses['color_raster'] = self.opt.lambda_color * ((fake_image_bias -
+                                                                 self.criterionColor(fake_image, fake_image_upper) -
+                                                                 self.criterionColor(fake_image, fake_image_lower)
+                                                                 ) * mask_foreground).sum() / mask_foreground.sum()
+            # try:
+            #     assert G_losses['color_raster'] >= 0
+            # except AssertionError:
+            #     print(G_losses['color_raster'].item())
 
         return G_losses, fake_image
 
@@ -172,8 +189,10 @@ class Pix2PixModel(torch.nn.Module):
         pred_fake, pred_real = self.discriminate(
             input_semantics, fake_image, real_image)
 
+        # pred_fake down to -1
         D_losses['D_Fake'] = self.criterionGAN(pred_fake, False,
                                                for_discriminator=True)
+        # pred_real up to 1
         D_losses['D_real'] = self.criterionGAN(pred_real, True,
                                                for_discriminator=True)
 

@@ -27,6 +27,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--beta1', type=float, default=0.0, help='momentum term of adam')
         parser.add_argument('--beta2', type=float, default=0.9, help='momentum term of adam')
         parser.add_argument('--no_TTUR', action='store_true', help='Use TTUR training scheme')
+        parser.add_argument('--color_raster', action='store_true', help='Use color raster loss')
 
         # the default values for beta1 and beta2 differ by TTUR option
         opt, _ = parser.parse_known_args()
@@ -40,6 +41,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--ndf', type=int, default=64, help='# of discrim filters in first conv layer')
         parser.add_argument('--lambda_feat', type=float, default=10.0, help='weight for feature matching loss')
         parser.add_argument('--lambda_vgg', type=float, default=10.0, help='weight for vgg loss')
+        parser.add_argument('--lambda_color', type=float, default=5.0, help='weight for color loss')
         parser.add_argument('--no_ganFeat_loss', action='store_true', help='if specified, do *not* use discriminator feature matching loss')
         parser.add_argument('--no_vgg_loss', action='store_true', help='if specified, do *not* use VGG feature matching loss')
         parser.add_argument('--gan_mode', type=str, default='hinge', help='(ls|original|hinge)')
