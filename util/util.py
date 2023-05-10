@@ -24,6 +24,7 @@ def load_obj(name):
     with open(name, 'rb') as f:
         return pickle.load(f)
 
+
 # returns a configuration for creating a generator
 # |default_opt| should be the opt of the current experiment
 # |**kwargs|: if any configuration should be overriden, it can be specified here
@@ -91,7 +92,8 @@ def tensor2im(image_tensor, imtype=np.uint8, normalize=True, tile=False):
         image_numpy = np.transpose(image_numpy, (1, 2, 0)) * 255.0
     image_numpy = np.clip(image_numpy, 0, 255)
     if image_numpy.shape[2] == 1:
-        image_numpy = image_numpy[:, :, 0]
+        # image_numpy = image_numpy[:, :, 0]
+        image_numpy = np.concatenate([image_numpy] * 3, -1)
     return image_numpy.astype(imtype)
 
 
@@ -186,7 +188,8 @@ def find_class_in_module(target_cls_name, module):
             cls = clsobj
 
     if cls is None:
-        print("In %s, there should be a class whose name matches %s in lowercase without underscore(_)" % (module, target_cls_name))
+        print("In %s, there should be a class whose name matches %s in lowercase without underscore(_)" % (
+            module, target_cls_name))
         exit(0)
 
     return cls
@@ -222,9 +225,12 @@ def uint82bin(n, count=8):
 def labelcolormap(N):
     if N == 35:  # cityscape
         cmap = np.array([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (111, 74, 0), (81, 0, 81),
-                         (128, 64, 128), (244, 35, 232), (250, 170, 160), (230, 150, 140), (70, 70, 70), (102, 102, 156), (190, 153, 153),
-                         (180, 165, 180), (150, 100, 100), (150, 120, 90), (153, 153, 153), (153, 153, 153), (250, 170, 30), (220, 220, 0),
-                         (107, 142, 35), (152, 251, 152), (70, 130, 180), (220, 20, 60), (255, 0, 0), (0, 0, 142), (0, 0, 70),
+                         (128, 64, 128), (244, 35, 232), (250, 170, 160), (230, 150, 140), (70, 70, 70),
+                         (102, 102, 156), (190, 153, 153),
+                         (180, 165, 180), (150, 100, 100), (150, 120, 90), (153, 153, 153), (153, 153, 153),
+                         (250, 170, 30), (220, 220, 0),
+                         (107, 142, 35), (152, 251, 152), (70, 130, 180), (220, 20, 60), (255, 0, 0), (0, 0, 142),
+                         (0, 0, 70),
                          (0, 60, 100), (0, 0, 90), (0, 0, 110), (0, 80, 100), (0, 0, 230), (119, 11, 32), (0, 0, 142)],
                         dtype=np.uint8)
     else:
@@ -275,3 +281,86 @@ class Colorize(object):
             color_image[2][mask] = self.cmap[label][2]
 
         return color_image
+
+
+class COLOR:
+    span_size = 20
+    discrete_colors = list(range(0, 210, span_size)) + [255]
+
+    @classmethod
+    def get_polar(cls, val):
+        distance = [abs(v - val) for v in cls.discrete_colors]
+        color_id = np.argmax(distance)
+        if cls.discrete_colors[color_id] == 255:
+            return [1.0, 1.0]
+        else:
+            return [cls.discrete_colors[color_id] / 255.,
+                    cls.discrete_colors[color_id + 1] / 255.]
+
+    @classmethod
+    def rgb_to_tanh(cls, val: float):
+        return (val / 255. - 0.5) * 2
+
+    @classmethod
+    def dicretize(cls, color_tensor):
+        """
+        color_tensor: range (-1, 1)
+
+        color_discrete_tensor = torch.Tensor(color_tensor.size(), dtype=color_tensor.dtype).to(color_tensor.device)
+        for color_id in range(len(cls.discrete_colors) - 2):
+            v_low = cls.discrete_colors[color_id] / 255.
+            v_high = cls.discrete_colors[color_id + 1] / 255.
+
+            mask = ((color_tensor >= v_low) & (color_tensor < v_high))
+            # 简化 0.5 * (v_high - v_low) ** 2 - (color_tensor - v_low) ** 2 - (color_tensor - v_high) ** 2
+            new_value = (2 * color_tensor * (v_high + v_low - color_tensor) - 0.5 * v_low ** 2 - 0.5 * v_high ** 2 - v_high * v_low)
+            color_discrete_tensor.masked_scatter_(mask, new_value)
+
+        """
+        # mask_modified = torch.zeros(color_tensor.size(), dtype=color_tensor.dtype).to(color_tensor.device)
+        color_tensor_bias = torch.zeros(color_tensor.size(), dtype=color_tensor.dtype).to(color_tensor.device)
+        color_tensor_high = torch.zeros(color_tensor.size(), dtype=color_tensor.dtype).to(color_tensor.device)
+        color_tensor_low = torch.zeros(color_tensor.size(), dtype=color_tensor.dtype).to(color_tensor.device)
+        for color_id in range(len(cls.discrete_colors) - 2):
+            # 每个颜色区间，计算上线、下限、偏移值
+            v_low = cls.rgb_to_tanh(cls.discrete_colors[color_id])
+            v_high = cls.rgb_to_tanh(cls.discrete_colors[color_id + 1])
+            mask = ((color_tensor >= v_low) & (color_tensor < v_high)).to(color_tensor.device)
+            color_tensor_high.masked_fill_(mask, v_high)
+            color_tensor_low.masked_fill_(mask, v_low)
+            color_tensor_bias.masked_fill_(mask, (v_high - v_low) ** 2)
+            # mask_modified.masked_fill_(mask, 1)
+
+            # try:
+            #     assert (mask * (color_tensor_bias - (color_tensor_high - color_tensor) ** 2 - (
+            #                 color_tensor_low - color_tensor) ** 2)).sum() >= 0
+            # except AssertionError:
+            #     print('loss below 0')
+
+        # 处理背景颜色类别, 200~220, 220~255
+        color_range_list = [
+            (cls.discrete_colors[-2], (cls.discrete_colors[-2] + cls.span_size), cls.discrete_colors[-2]),
+            ((cls.discrete_colors[-2] + cls.span_size), 256, 255)]
+        for color_range in color_range_list:
+            # color_range: (low, high, target)
+            mask = (color_tensor >= cls.rgb_to_tanh(color_range[0])) & \
+                   (color_tensor < cls.rgb_to_tanh(color_range[1])).to(color_tensor.device)
+            v_high = v_low = cls.rgb_to_tanh(color_range[2])
+            color_tensor_high.masked_fill_(mask, v_high)
+            color_tensor_low.masked_fill_(mask, v_low)
+            color_tensor_bias.masked_fill_(mask, 2 * (cls.rgb_to_tanh(color_range[0]) -
+                                                      cls.rgb_to_tanh(color_range[1])) ** 2)
+            # mask_modified.masked_fill_(mask, 1)
+
+        #     try:
+        #         assert (mask_modified * (color_tensor_bias - (color_tensor_high - color_tensor) ** 2 - (
+        #                     color_tensor_low - color_tensor) ** 2)).sum() >= 0
+        #     except AssertionError:
+        #         print('loss below 0')
+        #
+        # try:
+        #     assert mask_modified.all()
+        # except AssertionError:
+        #     print('not all pixels modified')
+
+        return color_tensor_high, color_tensor_low, color_tensor_bias
