@@ -30,6 +30,7 @@ class Pix2PixModel(torch.nn.Module):
                 opt.gan_mode, tensor=self.FloatTensor, opt=self.opt)
             self.criterionFeat = torch.nn.L1Loss()
             self.criterionColor = torch.nn.MSELoss(reduction='none')
+            self.criterionTV = networks.TVLoss(self.opt.lambda_TV)
             if not opt.no_vgg_loss:
                 self.criterionVGG = networks.VGGLoss(self.opt.gpu_ids)
             if opt.use_vae:
@@ -163,6 +164,9 @@ class Pix2PixModel(torch.nn.Module):
         if not self.opt.no_vgg_loss:
             G_losses['VGG'] = self.criterionVGG(fake_image, real_image) \
                               * self.opt.lambda_vgg
+
+        if self.opt.total_variation_loss:
+            G_losses['TV'] = self.criterionTV(fake_image)
 
         # 前景区域颜色区间化
         if self.opt.color_raster:
