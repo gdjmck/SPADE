@@ -4,6 +4,7 @@ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses
 """
 
 import torch
+import torch.functional as F
 import models.networks as networks
 import util.util as util
 
@@ -141,6 +142,9 @@ class Pix2PixModel(torch.nn.Module):
 
         if self.opt.use_vae:
             G_losses['KLD'] = KLD_loss
+
+        if self.opt.classify_color:
+            fake_image = F.softmax(fake_image, -1)
 
         pred_fake, pred_real = self.discriminate(
             input_semantics, fake_image, real_image)

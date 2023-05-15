@@ -76,7 +76,10 @@ class Pix2pixDataset(BaseDataset):
 
         transform_image = get_transform(self.opt, params)
         image_tensor = transform_image(image)
-        if self.opt.output_nc != image_tensor.size()[0]:
+        if self.opt.classify_color:
+            # 将颜色tensor转换为类别的one-hot tensor
+            pass
+        elif self.opt.output_nc != image_tensor.size()[0]:
             image_tensor = image_tensor[:self.opt.output_nc]
 
         # if using instance maps

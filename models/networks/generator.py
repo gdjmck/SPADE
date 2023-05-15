@@ -113,7 +113,8 @@ class SPADEGenerator(BaseNetwork):
             x = self.up_4(x, seg)
 
         x = self.conv_img(F.leaky_relu(x, 2e-1))
-        x = F.tanh(x)
+        if not self.opt.classify_color:
+            x = F.tanh(x)
 
         return x
 
