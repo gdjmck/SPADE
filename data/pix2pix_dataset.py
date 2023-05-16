@@ -2,6 +2,7 @@
 Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
+import torch
 
 from data.base_dataset import BaseDataset, get_params, get_transform, convert_label_image
 from PIL import Image
@@ -78,7 +79,8 @@ class Pix2pixDataset(BaseDataset):
         image_tensor = transform_image(image)
         if self.opt.classify_color:
             # 将颜色tensor转换为类别的one-hot tensor
-            pass
+            image_tensor = self.parse_label(image_tensor[0].cpu().numpy())
+            image_tensor = image_tensor.permute(2, 0, 1)
         elif self.opt.output_nc != image_tensor.size()[0]:
             image_tensor = image_tensor[:self.opt.output_nc]
 
