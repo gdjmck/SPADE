@@ -5,12 +5,24 @@ import torch.nn.functional as F
 from data.custom_dataset import CustomDataset
 from data.image_folder import make_dataset
 
+COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
 
 def open_op(img_mask):
     return cv2.dilate(cv2.erode(img_mask, np.ones((3, 3), dtype=np.uint8), 3), np.ones((3, 3), dtype=np.uint8), 3)
 
 
 class ArchDataset(CustomDataset):
+    @classmethod
+    def label2image(cls, label: np.ndarray):
+        label = label.squeeze()
+        label_max = label.max(0)
+        image = np.zeros(label.shape[-2:], dtype=np.uint8)
+        image[label[0] == label_max] = 255
+        for index in range(1, label.shape[0]):
+            image[label[index] == label_max] = COLOR_MAP[index-1]
+        return image
+
+
     def initialize(self, opt):
         super(ArchDataset, self).initialize(opt)
         self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
@@ -18,13 +30,16 @@ class ArchDataset(CustomDataset):
 
     def parse_label(self, img: np.ndarray):
         color_label_mask = np.zeros_like(img, dtype=np.uint8)
+        # -1 ~ 1 -> 0 ~ 255
+        img = (img + 1) * 255 / 2
 
         for colorId, color_val in self.COLOR_MAP.items():
             color_mask = ((img > color_val - 10) & (img < color_val + 10)).astype(np.uint8)  # full_size
             color_label_mask[color_mask > 0] = 1 + colorId  # full_size
-            num_conn, comp_mask = cv2.connectedComponents(color_mask, connectivity=4)
 
+            """
             # 合并小区域
+            num_conn, comp_mask = cv2.connectedComponents(color_mask, connectivity=4)
             for connId in range(num_conn):
                 if not ((comp_mask == connId) & color_mask).any():
                     continue
@@ -50,6 +65,8 @@ class ArchDataset(CustomDataset):
                     if attraction[target_label] / mask_current.sum() > 2:
                         color_label_mask[mask_current > 0] = target_label
                         # print('颜色{}归为{}，吃掉{}'.format(1 + colorId, target_label, mask_current.sum()))
+            """
+
         # convert to pixelwise one-hot tensor
         label_tensor = F.one_hot(torch.LongTensor(color_label_mask))
         return label_tensor

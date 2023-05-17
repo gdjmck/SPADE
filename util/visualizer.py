@@ -9,6 +9,8 @@ import time
 from . import util
 from . import html
 import scipy.misc
+import numpy as np
+from data.arch_dataset import ArchDataset
 try:
     from StringIO import StringIO  # Python 2.7
 except ImportError:
@@ -73,7 +75,9 @@ class Visualizer():
                 else:
                     img_path = os.path.join(self.img_dir, 'epoch%.3d_iter%.3d_%s.png' % (epoch, step, label))
                     if len(image_numpy.shape) >= 4:
-                        image_numpy = image_numpy[0]                    
+                        image_numpy = image_numpy[0]
+                    if self.opt.classify_color and not isinstance(image_numpy, np.ndarray):
+                        image_numpy = ArchDataset.label2image(image_numpy.cpu().detach().numpy())
                     util.save_image(image_numpy, img_path)
 
             # update website
@@ -130,7 +134,7 @@ class Visualizer():
             tile = self.opt.batchSize > 8
             if 'input_label' == key:
                 t = util.tensor2label(t, self.opt.label_nc + 2, tile=tile)
-            else:
+            elif t.size()[1] in (1, 3):
                 t = util.tensor2im(t, tile=tile)
             visuals[key] = t
         return visuals

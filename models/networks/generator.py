@@ -53,7 +53,10 @@ class SPADEGenerator(BaseNetwork):
             self.up_4 = SPADEResnetBlock(1 * nf, nf // 2, opt)
             final_nc = nf // 2
 
-        self.conv_img = nn.Conv2d(final_nc, self.opt.output_nc, 3, padding=1)
+        if self.opt.classify_color:
+            self.conv_img = nn.Conv2d(final_nc, self.opt.output_nc, 1, padding=0)
+        else:
+            self.conv_img = nn.Conv2d(final_nc, self.opt.output_nc, 3, padding=1)
 
         self.up = nn.Upsample(scale_factor=2)
 

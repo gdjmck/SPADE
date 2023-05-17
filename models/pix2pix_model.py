@@ -143,9 +143,6 @@ class Pix2PixModel(torch.nn.Module):
         if self.opt.use_vae:
             G_losses['KLD'] = KLD_loss
 
-        if self.opt.classify_color:
-            fake_image = F.softmax(fake_image, 1)
-
         pred_fake, pred_real = self.discriminate(
             input_semantics, fake_image, real_image)
 
@@ -223,6 +220,9 @@ class Pix2PixModel(torch.nn.Module):
 
         assert (not compute_kld_loss) or self.opt.use_vae, \
             "You cannot compute KLD loss if opt.use_vae == False"
+
+        if self.opt.classify_color:
+            fake_image = F.softmax(fake_image, 1)
 
         return fake_image, KLD_loss
 
