@@ -71,7 +71,7 @@ class SPADEResnetBlock(nn.Module):
 # ResNet block used in pix2pixHD
 # We keep the same architecture as pix2pixHD.
 class ResnetBlock(nn.Module):
-    def __init__(self, dim, norm_layer, activation=nn.ReLU(False), kernel_size=3):
+    def __init__(self, dim, norm_layer, activation=nn.ReLU(True), kernel_size=3):
         super().__init__()
 
         pw = (kernel_size - 1) // 2

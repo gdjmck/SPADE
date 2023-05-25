@@ -88,7 +88,7 @@ class SPADE(nn.Module):
         pw = ks // 2
         self.mlp_shared = nn.Sequential(
             nn.Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
-            nn.ReLU()
+            nn.ReLU(inplace=True)
         )
         self.mlp_gamma = nn.Conv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)
         self.mlp_beta = nn.Conv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)

@@ -286,6 +286,7 @@ class Colorize(object):
 class COLOR:
     span_size = 20
     discrete_colors = list(range(0, 210, span_size)) + [255]
+    COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
 
     @classmethod
     def get_polar(cls, val):
@@ -364,3 +365,18 @@ class COLOR:
         #     print('not all pixels modified')
 
         return color_tensor_high, color_tensor_low, color_tensor_bias
+
+
+    @classmethod
+    def classification2image(cls, class_tensor: torch.Tensor):
+        b, c, h, w = class_tensor.size()
+        weight_array = np.ones((b, c), dtype=np.float32)
+        bg_label, bg_value = 0, 1.0
+        weight_array[:, bg_label] = bg_value
+        for ch, val in cls.COLOR_MAP.items():
+            weight_array[:, ch+1] = val / 255.
+        weight_tensor = torch.FloatTensor(weight_array.reshape((b, c, 1, 1)))
+        weight_tensor = weight_tensor.to(class_tensor.device)
+        color_tensor = weight_tensor * class_tensor
+        color_tensor = (color_tensor.sum(1, keepdim=True) * 2) - 1  # [-1, 1]
+        return color_tensor

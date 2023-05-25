@@ -139,7 +139,7 @@ class Pix2PixHDGenerator(BaseNetwork):
         input_nc = opt.label_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
 
         norm_layer = get_nonspade_norm_layer(opt, opt.norm_G)
-        activation = nn.ReLU(False)
+        activation = nn.ReLU(True)
 
         model = []
 

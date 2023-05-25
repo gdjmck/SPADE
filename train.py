@@ -5,6 +5,7 @@ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses
 
 import sys
 from collections import OrderedDict
+import torch.cuda
 from options.train_options import TrainOptions
 import data
 from util.iter_counter import IterationCounter
@@ -30,6 +31,7 @@ iter_counter = IterationCounter(opt, len(dataloader))
 visualizer = Visualizer(opt)
 
 for epoch in iter_counter.training_epochs():
+    torch.cuda.empty_cache()
     iter_counter.record_epoch_start(epoch)
     for i, data_i in enumerate(dataloader, start=iter_counter.epoch_iter):
         iter_counter.record_one_iteration()

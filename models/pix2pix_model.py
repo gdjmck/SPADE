@@ -95,7 +95,7 @@ class Pix2PixModel(torch.nn.Module):
         netD = networks.define_D(opt) if opt.isTrain else None
         netE = networks.define_E(opt) if opt.use_vae else None
 
-        if not opt.isTrain or opt.continue_train:
+        if not opt.isTrain or opt.continue_train:  # or opt.isValidate
             netG = util.load_network(netG, 'G', opt.which_epoch, opt)
             if opt.isTrain:
                 netD = util.load_network(netD, 'D', opt.which_epoch, opt)
@@ -223,6 +223,7 @@ class Pix2PixModel(torch.nn.Module):
 
         if self.opt.classify_color:
             fake_image = F.softmax(fake_image, 1)
+            fake_image = util.COLOR.classification2image(fake_image)
 
         return fake_image, KLD_loss
 

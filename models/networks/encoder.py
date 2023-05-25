@@ -32,7 +32,7 @@ class ConvEncoder(BaseNetwork):
         self.fc_mu = nn.Linear(ndf * 8 * s0 * s0, 256)
         self.fc_var = nn.Linear(ndf * 8 * s0 * s0, 256)
 
-        self.actvn = nn.LeakyReLU(0.2, False)
+        self.actvn = nn.LeakyReLU(0.2, True)
         self.opt = opt
 
     def forward(self, x):
