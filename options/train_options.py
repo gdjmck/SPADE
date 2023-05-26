@@ -29,6 +29,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--no_TTUR', action='store_true', help='Use TTUR training scheme')
         parser.add_argument('--color_raster', action='store_true', help='Use color raster loss')
         parser.add_argument('--total_variation_loss', action='store_true', help='Use total variation loss')
+        parser.add_argument('--L1_loss', action='store_true', help='Use L1 loss for generated image and real image')
 
         # the default values for beta1 and beta2 differ by TTUR option
         opt, _ = parser.parse_known_args()
@@ -49,5 +50,6 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--gan_mode', type=str, default='hinge', help='(ls|original|hinge)')
         parser.add_argument('--netD', type=str, default='multiscale', help='(n_layers|multiscale|image)')
         parser.add_argument('--lambda_kld', type=float, default=0.05)
+        parser.add_argument('--lambda_l1', type=float, default=1.0)
         self.isTrain = True
         return parser

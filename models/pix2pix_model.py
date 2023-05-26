@@ -36,6 +36,8 @@ class Pix2PixModel(torch.nn.Module):
                 self.criterionVGG = networks.VGGLoss(self.opt.gpu_ids)
             if opt.use_vae:
                 self.KLDLoss = networks.KLDLoss()
+            if opt.L1_loss:
+                self.L1 = self.criterionFeat
 
     # Entry point for all calls involving forward pass
     # of deep networks. We used this approach since DataParallel module
@@ -149,6 +151,9 @@ class Pix2PixModel(torch.nn.Module):
         # maximize pred_fake
         G_losses['GAN'] = self.criterionGAN(pred_fake, True,
                                             for_discriminator=False)
+
+        if self.opt.L1_loss:
+            G_losses['L1'] = self.opt.lambda_l1 * self.L1(fake_image, real_image)
 
         if not self.opt.no_ganFeat_loss:
             num_D = len(pred_fake)
