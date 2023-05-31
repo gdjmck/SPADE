@@ -126,10 +126,10 @@ class Pix2PixHDGenerator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
         parser.add_argument('--resnet_n_downsample', type=int, default=4, help='number of downsampling layers in netG')
-        parser.add_argument('--resnet_n_blocks', type=int, default=9, help='number of residual blocks in the global generator network')
+        parser.add_argument('--resnet_n_blocks', type=int, default=4, help='number of residual blocks in the global generator network')
         parser.add_argument('--resnet_kernel_size', type=int, default=3,
                             help='kernel size of the resnet block')
-        parser.add_argument('--resnet_initial_kernel_size', type=int, default=7,
+        parser.add_argument('--resnet_initial_kernel_size', type=int, default=3,
                             help='kernel size of the first convolution')
         parser.set_defaults(norm_G='instance')
         return parser
