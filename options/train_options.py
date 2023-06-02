@@ -30,6 +30,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--color_raster', action='store_true', help='Use color raster loss')
         parser.add_argument('--total_variation_loss', action='store_true', help='Use total variation loss')
         parser.add_argument('--L1_loss', action='store_true', help='Use L1 loss for generated image and real image')
+        parser.add_argument('--volume_rate', action='store_true', help='volume rate of input image as a condition to insert into generator network')
 
         # the default values for beta1 and beta2 differ by TTUR option
         opt, _ = parser.parse_known_args()

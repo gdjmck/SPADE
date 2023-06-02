@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from data.custom_dataset import CustomDataset
 from data.image_folder import make_dataset
+from util.volume_rate import VolumeRate
 
 COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
 
@@ -26,6 +27,7 @@ class ArchDataset(CustomDataset):
     def initialize(self, opt):
         super(ArchDataset, self).initialize(opt)
         self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
+        self.VR_history = VolumeRate()
 
 
     def parse_label(self, img: np.ndarray):

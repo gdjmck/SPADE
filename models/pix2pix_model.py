@@ -44,11 +44,11 @@ class Pix2PixModel(torch.nn.Module):
     # can't parallelize custom functions, we branch to different
     # routines based on |mode|.
     def forward(self, data, mode):
-        input_semantics, real_image = self.preprocess_input(data)
+        input_semantics, real_image, vr = self.preprocess_input(data)  # vr = None if not opt.volume_rate
 
         if mode == 'generator':
             g_loss, generated = self.compute_generator_loss(
-                input_semantics, real_image)
+                input_semantics, real_image, vr)
             return g_loss, generated
         elif mode == 'discriminator':
             d_loss = self.compute_discriminator_loss(
@@ -118,6 +118,8 @@ class Pix2PixModel(torch.nn.Module):
             data['label'] = data['label'].cuda()
             data['instance'] = data['instance'].cuda()
             data['image'] = data['image'].cuda()
+            if self.opt.volume_rate:
+                data['vr'] = data['vr'].cuda()
 
         # create one-hot label map
         label_map = data['label']
@@ -134,13 +136,13 @@ class Pix2PixModel(torch.nn.Module):
             instance_edge_map = self.get_edges(inst_map)
             input_semantics = torch.cat((input_semantics, instance_edge_map), dim=1)
 
-        return input_semantics, data['image']
+        return input_semantics, data['image'], data.get('vr', None)
 
-    def compute_generator_loss(self, input_semantics, real_image):
+    def compute_generator_loss(self, input_semantics, real_image, vr=None):
         G_losses = {}
 
         fake_image, KLD_loss = self.generate_fake(
-            input_semantics, real_image, compute_kld_loss=self.opt.use_vae)
+            input_semantics, real_image, compute_kld_loss=self.opt.use_vae, volume_ratio=vr)
 
         if self.opt.use_vae:
             G_losses['KLD'] = KLD_loss
@@ -213,11 +215,13 @@ class Pix2PixModel(torch.nn.Module):
         z = self.reparameterize(mu, logvar)
         return z, mu, logvar
 
-    def generate_fake(self, input_semantics, real_image, compute_kld_loss=False):
+    def generate_fake(self, input_semantics, real_image, compute_kld_loss=False, volume_ratio=None):
         z = None
         KLD_loss = None
         if self.opt.use_vae:
             z, mu, logvar = self.encode_z(real_image)
+            if volume_ratio is not None:
+                z[:, -1] = volume_ratio
             if compute_kld_loss:
                 KLD_loss = self.KLDLoss(mu, logvar) * self.opt.lambda_kld
 
