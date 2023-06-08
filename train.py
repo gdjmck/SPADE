@@ -33,6 +33,8 @@ visualizer = Visualizer(opt)
 for epoch in iter_counter.training_epochs():
     torch.cuda.empty_cache()
     iter_counter.record_epoch_start(epoch)
+    if epoch > 1:
+        dataloader.dataset.condition_history.update_mean_and_stdvar()
     for i, data_i in enumerate(dataloader, start=iter_counter.epoch_iter):
         iter_counter.record_one_iteration()
 

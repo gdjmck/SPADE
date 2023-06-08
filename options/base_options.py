@@ -38,6 +38,9 @@ class BaseOptions():
         parser.add_argument('--label_nc', type=int, default=182, help='# of input label classes without unknown class. If you have unknown class as class label, specify --contain_dopntcare_label.')
         parser.add_argument('--contain_dontcare_label', action='store_true', help='if the label map contains dontcare label (dontcare=255)')
         parser.add_argument('--output_nc', type=int, default=3, help='# of output image channels')
+        parser.add_argument('--input_nc', type=int, default=3, help='# of input image channel, if necessary')
+        parser.add_argument('--condition_size', type=int, default=5, help='# of condition')
+        parser.add_argument('--condition_norm', type=str, default='./config/mean&stdvar.json', help='json file that contains default mean and stdvar value of condition vector')
 
         # for setting inputs
         parser.add_argument('--dataroot', type=str, default='./datasets/cityscapes/')

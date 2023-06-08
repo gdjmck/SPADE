@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from data.custom_dataset import CustomDataset
 from data.image_folder import make_dataset
-from util.volume_rate import VolumeRate
+from util.volume_rate import Condition
 
 COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
 
@@ -23,11 +23,19 @@ class ArchDataset(CustomDataset):
             image[label[index] == label_max] = COLOR_MAP[index-1]
         return image
 
+    def __getitem__(self, index):
+        result = super(ArchDataset, self).__getitem__(index)
+        if self.opt.condition_size:
+            # 添加回归属性
+            condition = self.condition_history.get(self.image_paths[index])
+            result['condition'] = torch.tensor(condition, dtype=torch.float32)
+            return result
+
 
     def initialize(self, opt):
         super(ArchDataset, self).initialize(opt)
         self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
-        self.VR_history = VolumeRate()
+        self.condition_history = Condition(opt)
 
 
     def parse_label(self, img: np.ndarray):

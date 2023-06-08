@@ -6,6 +6,8 @@ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import functools
+import math
 from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
 from models.networks.architecture import ResnetBlock as ResnetBlock
@@ -184,3 +186,106 @@ class Pix2PixHDGenerator(BaseNetwork):
 
     def forward(self, input, z=None):
         return self.model(input)
+
+
+class UNetGenerator(BaseNetwork):
+    def __init__(self, opt, norm_layer=nn.BatchNorm2d):
+        """
+        num_downs: 最小为 5
+        """
+        super(UNetGenerator, self).__init__()
+        self.num_downs = math.ceil(math.log2(opt.crop_size))
+        self.ngf = opt.ngf  # default: 64
+        self.condition_size = opt.condition_size  # default: 5
+        self.down_seq = []
+        self.up_seq = []  # 最后做reverse
+        # UNet最外层
+        self.down_seq.append(self.downconv(opt.input_nc, self.ngf, 'outer', norm_layer=norm_layer))
+        self.up_seq.append(self.upconv(2 * self.ngf, opt.output_nc, 'outer', norm_layer=norm_layer))
+        # UNet中间层（特征深度有变化）
+        for i in range(3):
+            # outer_nc = ngf; inner_nc = 2*ngf; input_nc = ngf
+            channel_ratio = 2 ** i
+            self.down_seq.append(self.downconv(self.ngf * channel_ratio, 2 * self.ngf * channel_ratio,
+                                               'middle', norm_layer=norm_layer))
+            self.up_seq.append(self.upconv(4 * self.ngf * channel_ratio, self.ngf * channel_ratio,
+                                           'middle', norm_layer=norm_layer))
+        # UNet中间层（特征深度不变）
+        for i in range(max(0, self.num_downs - 5)):
+            self.down_seq.append(self.downconv(8 * self.ngf, 8 * self.ngf, 'middle', norm_layer=norm_layer))
+            self.up_seq.append(self.upconv(16 * self.ngf, 8 * self.ngf, 'middle', norm_layer=norm_layer))
+        # UNet最里层
+        self.down_seq.append(self.downconv(8 * self.ngf, 8 * self.ngf, 'inner', norm_layer=norm_layer))
+        self.up_seq.append(self.upconv(8 * self.ngf, 8 * self.ngf, 'inner', norm_layer=norm_layer))
+
+        # 属性fusion层
+        self.fusion = nn.Sequential(nn.Linear(8 * self.ngf + opt.condition_size, 8 * self.ngf),
+                                    nn.ReLU(True))
+
+        self.up_seq = self.to_moduleList(self.up_seq, reverse=True)
+        self.down_seq = self.to_moduleList(self.down_seq, reverse=False)
+
+        self.post_act = nn.Tanh()
+
+    def to_moduleList(self, module_list: list, reverse=False):
+        if reverse:
+            module_list = module_list[::-1]
+        return nn.ModuleList(module_list)
+
+    def forward(self, x, condition_vec):
+        shortcuts = []
+        # 下采样过程
+        for layer_i in range(len(self.down_seq)):
+            x = self.down_seq[layer_i](x)
+            # print('下采样_{}的输出尺寸:{}'.format(layer_i, x.size()))
+            shortcuts.append(x)
+        # 加入条件向量
+        if self.condition_size:
+            b, c, h, w = x.size()
+            x_with_condition = torch.cat([x.view(b, -1), condition_vec], 1)
+            x = self.fusion(x_with_condition).view(b, c, h, w)
+
+        # 上采样过程
+        for layer_i in range(len(self.up_seq)):
+            feature_shortcut = shortcuts.pop()
+            if layer_i != 0:
+                # print('上采样_{}: 拼接尺寸 shortcut: {}与 当前: {}'.format(layer_i,
+                #                                          feature_shortcut.size(),
+                #                                          x.size()))
+                x = torch.cat([x, feature_shortcut], 1)
+            x = self.up_seq[layer_i](x)
+            # print('上采样_{}输出:{}'.format(layer_i, x.size()))
+        # output activation
+        x = self.post_act(x)
+        return x
+
+    def downconv(self, in_nc: int, out_nc: int, down_type: str, norm_layer=nn.BatchNorm2d):
+        # set use_bias
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
+        if down_type == 'inner':
+            down = [nn.LeakyReLU(0.2)] + down
+        elif down_type == 'middle':
+            down = [nn.LeakyReLU(0.2)] + down + [norm_layer(out_nc)]
+        else:  # down_type == 'outer'
+            pass
+        return nn.Sequential(*down)
+
+    def upconv(self, in_nc: int, out_nc: int, up_type: str, norm_layer=nn.BatchNorm2d):
+        # set use_bias
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        up = [nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
+        if up_type in ['inner', 'middle']:
+            up = [nn.ReLU()] + up + [norm_layer(out_nc)]
+        else:  # up_type == 'outer'
+            up = [nn.ReLU()] + up + [nn.Tanh()]
+        return nn.Sequential(*up)
+

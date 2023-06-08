@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
 import util.util as util
+import functools
 
 
 class MultiscaleDiscriminator(BaseNetwork):
@@ -118,3 +119,81 @@ class NLayerDiscriminator(BaseNetwork):
             return results[1:]
         else:
             return results[-1]
+
+
+class UNetDiscriminator(BaseNetwork):
+    """Defines a PatchGAN discriminator"""
+
+    def __init__(self, opt, n_layers=2, norm_layer=nn.BatchNorm2d):
+        """
+        n_layers：(包含第一步下采样卷积)总卷积次数
+        opt.ndf: default: 32
+        """
+        super(UNetDiscriminator, self).__init__()
+        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
+            self.use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            self.use_bias = norm_layer == nn.InstanceNorm2d
+
+        self.kw = 4
+        self.padw = 1
+        self.condition_size = opt.condition_size  # 回归值的个数
+
+        # 共同特征提取头
+        head_layers = [nn.Conv2d(opt.input_nc, opt.ndf, kernel_size=self.kw, stride=2, padding=self.padw),
+                       nn.LeakyReLU(0.2, True)]
+        nf_mult = 1
+        for n in range(1, n_layers):  # gradually increase the number of filters
+            nf_mult_prev = nf_mult
+            nf_mult = min(2 ** n, 8)
+            head_layers += [self.conv_block(opt.ndf * nf_mult_prev, opt.ndf * nf_mult, stride=2)]
+        self.head = nn.Sequential(*head_layers)
+
+        # Patch Discriminator
+        patch_layers = []
+        # channel 2*ndf -> 4*ndf, keeps spatial dimension
+        # channel 4*ndf -> 8*ndf, keeps spatial dimension
+        patch_layers += [self.conv_block(2*opt.ndf, 4*opt.ndf, stride=1),
+                         self.conv_block(4*opt.ndf, 8*opt.ndf, stride=1)]
+        patch_layers += [nn.Conv2d(8*opt.ndf, 1, kernel_size=3, stride=1, padding=self.padw, bias=self.use_bias)]
+        self.patch_discriminator = nn.Sequential(*patch_layers)
+
+        # Regression Head
+        regression_layers = [self.conv_block(2*opt.ndf, 4*opt.ndf, stride=2),
+                             self.conv_block(4*opt.ndf, 4*opt.ndf, stride=2),
+                             self.conv_block(4*opt.ndf, 8*opt.ndf, stride=2)]
+        regression_layers += [nn.Conv2d(8*opt.ndf, 8*opt.ndf, kernel_size=self.kw, stride=2, padding=self.padw),
+                              nn.ReLU(True),
+                              nn.Conv2d(8*opt.ndf, self.condition_size, kernel_size=self.kw, stride=1, padding=0)]
+        self.regression = nn.Sequential(*regression_layers)
+
+
+    def conv_block(self, in_nc: int, out_nc: int, stride: int, norm_layer=nn.BatchNorm2d):
+        return nn.Sequential(nn.Conv2d(in_nc, out_nc, kernel_size=self.kw, stride=stride,
+                                       bias=self.use_bias, padding=self.padw),
+                             norm_layer(out_nc), nn.LeakyReLU(0.2, True))
+
+
+    def forward(self, input):
+        """Standard forward."""
+        b, c, h, w = input.size()
+        base_feature = self.head(input)
+        discrimination = self.patch_discriminator(base_feature)
+        condition_regression = self.regression(base_feature)
+        condition_regression = condition_regression.view(b, self.condition_size)
+        return discrimination, condition_regression
+
+if __name__ == '__main__':
+    import hiddenlayer as h
+    import torch.onnx
+    from options.train_options import TrainOptions
+    # parse options
+    opt = TrainOptions().parse()
+
+    model = UNetDiscriminator(opt).regression
+    model_file = './UNetDiscriminator.pth'
+    x = torch.randn(1, 64, 64, 64)
+
+    # 使用hiddenlayer分析模型
+    graph = h.build_graph(model, x)
+    graph.save(path='./hiddenlayer.png', format='png')

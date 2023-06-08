@@ -103,11 +103,6 @@ class Pix2pixDataset(BaseDataset):
                       'path': image_path,
                       }
 
-        # 容积率
-        if self.opt.volume_rate:
-            vr = self.VR_history.get(image_path)
-            input_dict['vr'] = torch.tensor(vr)
-
         # Give subclasses a chance to modify the final output
         self.postprocess(input_dict)
 

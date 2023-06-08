@@ -44,11 +44,11 @@ class Pix2PixModel(torch.nn.Module):
     # can't parallelize custom functions, we branch to different
     # routines based on |mode|.
     def forward(self, data, mode):
-        input_semantics, real_image, vr = self.preprocess_input(data)  # vr = None if not opt.volume_rate
+        input_semantics, real_image, condition = self.preprocess_input(data)  # vr = None if not opt.volume_rate
 
         if mode == 'generator':
             g_loss, generated = self.compute_generator_loss(
-                input_semantics, real_image, vr)
+                input_semantics, real_image, condition)
             return g_loss, generated
         elif mode == 'discriminator':
             d_loss = self.compute_discriminator_loss(
