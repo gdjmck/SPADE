@@ -8,6 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
+import torch.nn.utils.spectral_norm as spectral_norm
 import util.util as util
 import functools
 
@@ -130,6 +131,7 @@ class UNetDiscriminator(BaseNetwork):
         opt.ndf: default: 32
         """
         super(UNetDiscriminator, self).__init__()
+        self.opt = opt
         if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
             self.use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
@@ -169,9 +171,11 @@ class UNetDiscriminator(BaseNetwork):
 
 
     def conv_block(self, in_nc: int, out_nc: int, stride: int, norm_layer=nn.BatchNorm2d):
-        return nn.Sequential(nn.Conv2d(in_nc, out_nc, kernel_size=self.kw, stride=stride,
-                                       bias=self.use_bias, padding=self.padw),
-                             norm_layer(out_nc), nn.LeakyReLU(0.2, True))
+        conv = nn.Conv2d(in_nc, out_nc, kernel_size=self.kw, stride=stride,
+                         bias=self.use_bias, padding=self.padw)
+        if 'spectral' in self.opt.norm_D:
+            conv = spectral_norm(conv)
+        return nn.Sequential(conv, norm_layer(out_nc), nn.LeakyReLU(0.2, True))
 
 
     def forward(self, input):
