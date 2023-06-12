@@ -29,11 +29,11 @@ class Condition:
         for i, condition in enumerate(self.condition_dict.values()):
             data[i] = np.array(condition) * self.condition_stdvar + self.condition_mean
 
-        print('旧均值:{}\n旧标准差为:{}'.format(self.condition_mean.tolist(),
-                                              self.condition_stdvar.tolist()))
+        # print('旧均值:{}\n旧标准差为:{}'.format(self.condition_mean.tolist(),
+        #                                       self.condition_stdvar.tolist()))
         mean_update = data.mean(0)
         var_update = data.std(0)
-        print('更新的均值为:{}\n标准差为:{}'.format(mean_update, var_update))
+        # print('更新的均值为:{}\n标准差为:{}'.format(mean_update, var_update))
 
     def get_mask(self, mask_all, floor: int):
         segment = math.floor(floor / 3)
@@ -115,6 +115,11 @@ class Condition:
         floor_avg = float(np.mean(floor_list)) if floor_list else 0
 
         return [field_area, floor_avg, density, num_builds, volume_rate]
+
+    def get_volume_rate(self, file):
+        condition = self.get(file)
+        vr = condition[-1]
+        return (vr * self.condition_stdvar[-1]) + self.condition_mean[-1]
 
     def get(self, file):
         if not os.path.exists(file):

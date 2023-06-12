@@ -6,13 +6,14 @@ import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import Polygon, LineString
+from shapely.affinity import scale, translate
 from geopandas import GeoSeries
 from PIL import Image
 
 
 def extract_outloop(img):
     contour, hierachy = cv2.findContours(cv2.threshold(img, 250, 1, cv2.THRESH_BINARY_INV)[1],
-                                                      cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                                         cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if hierachy.shape[1] > 1:  # 有多个轮廓
         contour = [c for c in contour if c.shape[0] > 2]  # 去除 点与线
         if len(contour) > 1:  # 只保留面积最大的
@@ -23,18 +24,31 @@ def extract_outloop(img):
         contour.append(contour[0])
     return contour
 
+
 def open_op(img_mask):
     return cv2.dilate(cv2.erode(img_mask, np.ones((3, 3)), 3), np.ones((3, 3)), 3)
 
+
 class PostProcess:
-    def __init__(self, tolerance=1.0):
+    def __init__(self, max_size, tolerance=1.0):
         self.tolerance = tolerance
-        self.field_loop = None
-        self.img = None
-        self.mask = None
-        self.num_comp = -1
-        self.bg_id = -1
-        self.building_list = []
+        self.max_size = max_size  # 用于y轴反转
+        self.minBuildArea = 25
+        self.segment_to_color = {0: 200,
+                                 1: 180,
+                                 2: 160,
+                                 3: 140,
+                                 4: 120,
+                                 5: 100,
+                                 6: 80,
+                                 7: 60,
+                                 8: 40,
+                                 9: 20,
+                                 10: 0}
+        self.init()
+
+    def init(self):
+        self.clear()
 
     def clear(self):
         self.field_loop = None
@@ -43,15 +57,35 @@ class PostProcess:
         self.num_comp = -1
         self.bg_id = -1
         self.building_list = []
+        self.floor_list = []
+        self.build2maskId = {}
+        self.scale = 0  # 一个像素代表的面积
 
-    def process(self, img):
+    def color2floor(self, color_val: int):
+        nearest_color_segment = min(self.segment_to_color.keys(),
+                                    key=lambda segment: abs(color_val - self.segment_to_color[segment]))
+        return (nearest_color_segment + 1) * 3
+
+    def set_scale(self):
+        h, w = self.img.shape[:2]
+        assert h == w
+        self.scale = (300 / h) ** 2
+
+    def process(self, img, type='real'):
+        """
+
+        """
         self.clear()
         self.img = img
+        self.set_scale()
 
         self.field_loop = LineString(extract_outloop(img))
-        # img_bin = cv2.adaptiveThreshold(img, 255, adaptiveMethod=cv2.ADAPTIVE_THRESH_MEAN_C,
-        #                                 thresholdType=cv2.THRESH_BINARY_INV, blockSize=25, C=5)
-        img_bin = cv2.threshold(img, 250, 1, cv2.THRESH_BINARY_INV)[1]
+        if type == 'real':
+            img_bin = cv2.threshold(img, 250, 1, cv2.THRESH_BINARY_INV)[1]
+        else:
+            img_bin = cv2.adaptiveThreshold(img, 255, adaptiveMethod=cv2.ADAPTIVE_THRESH_MEAN_C,
+                                            thresholdType=cv2.THRESH_BINARY_INV, blockSize=25, C=5)
+
         flat_area = open_op(img_bin) & img_bin
         self.num_comp, self.mask = cv2.connectedComponents(flat_area, connectivity=4)
         self.bg_id = self.mask[0, 0]
@@ -60,7 +94,36 @@ class PostProcess:
         for i in range(self.num_comp):
             if i == self.bg_id:
                 continue
+            mask = self.mask == i
+            cover_area = mask.sum()
+            # 过滤面积小于25㎡
+            if cover_area * self.scale < self.minBuildArea:
+                continue
+            if self.contain_multiple_object(mask):
+                print('轮廓索引{}包含多个建筑'.format(len(self.building_list)))
+
             self.extract_build(self.mask == i)
+
+    def contain_multiple_object(self, mask):
+        color_vals = self.img[mask]
+        color_stats = Image.fromarray(color_vals).getcolors(color_vals.shape[0])
+        if len(color_stats) < 2:
+            return False
+        # 按频数高到低排序
+        color_stats = sorted(color_stats, key=lambda item: item[0], reverse=True)
+        # 颜色数量比例不超过5: 1 && 颜色差值大于20
+        color_most, color_second_most = color_stats[:2]
+        if color_most[0] / color_second_most[0] <= 5 and abs(color_most[1] - color_second_most[1]) > 20:
+            # 暂且认为只会有
+            return True
+        else:
+            return False, None
+
+    def add_build(self, build_loop: list, mask):
+        mask_val = np.median(self.mask[mask])
+        self.build2maskId[len(self.building_list)] = mask_val  # 用于调试时查看楼栋对应的mask，self.mask == build.index
+        self.building_list.append(build_loop)
+        self.floor_list.append(self.color2floor(np.median(self.img[mask])))
 
     def extract_build(self, mask):
         # val = np.median(self.img[mask])
@@ -68,8 +131,97 @@ class PostProcess:
         loop = self.simplify(loop[0])
         # 楼栋轮廓不能与红线相交
         loop = self.seperate(loop)
+        # 判断楼栋轮廓内是否只有一种楼
+        multi_build, colors = self.is_multipart(mask)
+        multi_build = False  # 先屏蔽裙楼
+        if multi_build:
+            # 区分不同楼栋
+            # 假设存在不同楼栋的情况只有内部包含另外一种楼
+            mask1 = mask & (self.img == colors[0][1])
+            mask2 = mask & (self.img == colors[1][1])
+            hole1 = PostProcess.find_hole(mask1)
+            hole2 = PostProcess.find_hole(mask2)
+            assert any([len(hole1), len(hole2)])
 
-        self.building_list.append(loop)
+            mask_w_hole = mask1
+            mask_wo_hole = mask2
+        else:
+            self.add_build(loop, mask=mask)
+
+        return loop
+
+    def to_output(self, real_center, standard_size):
+        """
+        构造返回数据
+        """
+        outloop = self.building_list
+        field_size = (self.field_loop.bounds[2]-self.field_loop.bounds[0],
+                      self.field_loop.bounds[3]-self.field_loop.bounds[1])
+        scaler = min([s_real / s_gen for s_gen, s_real in zip(field_size, standard_size)], key=lambda v: abs(v-1))
+        field_poly = Polygon(self.field_loop)
+        bias_dict = {'xoff': real_center[0]-field_poly.centroid.x,
+                     'yoff': real_center[1]-field_poly.centroid.y}
+        # 恢复偏移
+        for i in range(len(outloop)):
+            outloop_ls = LineString(np.array(outloop[i]))
+            outloop_ls = scale(translate(outloop_ls, **bias_dict),
+                               scaler, scaler, origin=list(real_center)+[0.0])
+            outloop[i] = np.array(outloop_ls.coords).tolist()
+        # # 把生成的地块轮廓也加上
+        # field_outloop = scale(translate(self.field_loop, **bias_dict), scaler, scaler, origin=list(real_center)+[0.0])
+        # print('生成的地块轮廓重心:{}'.format(Polygon(field_outloop).centroid))
+        # outloop.append(np.array(field_outloop.coords).tolist())
+        return {'outloop': outloop, 'floor': self.floor_list}
+
+    ################# 工具函数 #############################
+
+    def is_multipart(self, mask):
+        """
+        判断图像img的掩码mask中是否有多种颜色（多种建筑）
+        """
+        color_list = self.img[mask]
+        colors = Image.fromarray(color_list).getcolors(color_list.shape[0])
+        # 取数量最多的2个颜色
+        colors = sorted(colors, key=lambda item: item[0], reverse=True)
+        color_most, color_2nd_most = colors[:2]
+        # 最多颜色数量 / 第二多颜色数量 < 5 && abs(最多颜色 - 第二多颜色) > 30 (跨度超过1个色域)
+        if color_most[0] / color_2nd_most[0] < 5 and abs(color_most[1] - color_2nd_most[1]) > 30:
+            return True, colors
+        else:
+            return False, colors
+
+    @classmethod
+    def find_hole(cls, mask):
+        hole_list = []
+        try:
+            pts, hierachy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        except TypeError:
+            mask = mask.astype(np.uint8)
+            pts, hierachy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+        hierachy = hierachy.reshape(-1, 4)
+        children_index = np.where(hierachy[:, -1] != -1)[0]
+        for child_index in children_index:
+            child = pts[child_index].reshape(-1, 2)
+            if child.shape[0] < 3:
+                continue
+            child_area = Polygon(child).area
+
+            parent_index = hierachy[child_index][3]
+            if hierachy[parent_index][-1] != -1:  # 只取最外层的子轮廓
+                print('非外层的子轮廓')
+                continue
+            parent = pts[parent_index].reshape(-1, 2)
+            parent_area = Polygon(parent).area
+            child_area_over_parent = child_area / parent_area
+            print('child面积占比{:.2f}'.format(child_area_over_parent))
+            if child_area_over_parent > 0.2:
+                child = child.tolist()
+                if child[0] != child[-1]:
+                    child.append(child[0])
+                hole_list.append(child)
+        print('内部空洞个数:{}'.format(len(hole_list)))
+        return hole_list
 
     def seperate(self, loop: list):
         """

@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import functools
 import math
+import torch.nn.utils.spectral_norm as spectral_norm
 from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
 from models.networks.architecture import ResnetBlock as ResnetBlock
@@ -194,6 +195,7 @@ class UNetGenerator(BaseNetwork):
         num_downs: 最小为 5
         """
         super(UNetGenerator, self).__init__()
+        self.opt = opt
         self.num_downs = math.ceil(math.log2(opt.crop_size))
         self.ngf = opt.ngf  # default: 64
         self.condition_size = opt.condition_size  # default: 5
@@ -267,6 +269,8 @@ class UNetGenerator(BaseNetwork):
             use_bias = norm_layer == nn.InstanceNorm2d
 
         down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
+        if 'spectral' in self.opt.norm_G:
+            down = [spectral_norm(down[0])]
         if down_type == 'inner':
             down = [nn.LeakyReLU(0.2)] + down
         elif down_type == 'middle':
