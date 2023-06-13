@@ -222,7 +222,7 @@ class UNetGenerator(BaseNetwork):
 
         # 属性fusion层
         self.fusion = nn.Sequential(nn.Linear(8 * self.ngf + opt.condition_size, 8 * self.ngf),
-                                    nn.ReLU(True))
+                                    nn.ReLU())
 
         self.up_seq = self.to_moduleList(self.up_seq, reverse=True)
         self.down_seq = self.to_moduleList(self.down_seq, reverse=False)
