@@ -43,14 +43,20 @@ class Pix2PixTrainer():
             except AttributeError:
                 param_iterator = self.pix2pix_model.module.netD.named_parameters()
             for name, param in param_iterator:
-                self.summary_writer.add_histogram(f'{name}.grad', param.grad, step_index)
+                try:
+                    self.summary_writer.add_histogram(f'{name}.grad', param.grad, step_index)
+                except:
+                    print('{} got no param'.format(name))
         else:
             try:
                 param_iterator = self.pix2pix_model.netG.named_parameters()
             except AttributeError:
                 param_iterator = self.pix2pix_model.module.netG.named_parameters()
             for name, param in param_iterator:
-                self.summary_writer.add_histogram(f'{name}.grad', param.grad, step_index)
+                try:
+                    self.summary_writer.add_histogram(f'{name}.grad', param.grad, step_index)
+                except:
+                    print('{} got no param'.format(name))
 
     def run_generator_one_step(self, data):
         self.optimizer_G.zero_grad()

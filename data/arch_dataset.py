@@ -29,7 +29,7 @@ class ArchDataset(CustomDataset):
             # 添加回归属性
             condition = self.condition_history.get(self.image_paths[index])
             result['condition'] = torch.tensor(condition, dtype=torch.float32)
-            return result
+        return result
 
 
     def initialize(self, opt):

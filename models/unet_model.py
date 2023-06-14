@@ -24,7 +24,7 @@ class UNetModel(Pix2PixModel):
         if self.use_gpu():
             data['label'] = data['label'].cuda()
             data['image'] = data['image'].cuda()
-            data['condition'] = data['condition'].cuda()
+            data['condition'] = data['condition'].cuda() if self.opt.condition_size else None
 
         # # create one-hot label map
         # label_map = data['label']
@@ -47,7 +47,10 @@ class UNetModel(Pix2PixModel):
         patch, condition = self.netD(fake_and_real)
 
         patch_fake, patch_real = self.divide_pred(patch)
-        condition_fake, condition_real = self.divide_pred(condition)
+        if self.opt.condition_size:
+            condition_fake, condition_real = self.divide_pred(condition)
+        else:
+            condition_fake, condition_real = None, None
 
         return patch_fake, condition_fake, patch_real, condition_real
 
@@ -62,7 +65,8 @@ class UNetModel(Pix2PixModel):
 
         G_losses['GAN'] = self.criterionGAN(patch_fake, True, for_discriminator=False)
         G_losses['recon'] = self.opt.lambda_l1 * self.criterion_recon(fake_image, real_image)
-        G_losses['G_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_fake, condition)
+        if self.opt.condition_size:
+            G_losses['G_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_fake, condition)
 
         return G_losses, fake_image
 
@@ -77,7 +81,8 @@ class UNetModel(Pix2PixModel):
 
         D_losses['D_fake'] = self.criterionGAN(patch_fake, False, for_discriminator=True)
         D_losses['D_real'] = self.criterionGAN(patch_real, True, for_discriminator=True)
-        D_losses['D_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_real, condition)
+        if self.opt.condition_size:
+            D_losses['D_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_real, condition)
 
         return D_losses
 

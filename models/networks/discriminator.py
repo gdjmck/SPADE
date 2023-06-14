@@ -185,8 +185,11 @@ class UNetDiscriminator(BaseNetwork):
         b, c, h, w = input.size()
         base_feature = self.head(input)
         discrimination = self.patch_discriminator(base_feature)
-        condition_regression = self.regression(base_feature)
-        condition_regression = condition_regression.view(b, self.condition_size)
+        if self.opt.condition_size:
+            condition_regression = self.regression(base_feature)
+            condition_regression = condition_regression.view(b, self.condition_size)
+        else:
+            condition_regression = None
         return discrimination, condition_regression
 
 
