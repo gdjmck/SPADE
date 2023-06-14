@@ -270,15 +270,26 @@ class UNetGenerator(BaseNetwork):
         # use_bias on
         use_bias = True
 
-        down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
+        down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias),
+                nn.Conv2d(out_nc, out_nc, kernel_size=1, stride=1, padding=0)]
         if 'spectral' in self.opt.norm_G:
-            down = [spectral_norm(down[0])]
+            down = [spectral_norm(down_op) for down_op in down]
         if down_type == 'inner':
-            down = down + [nn.LeakyReLU(0.2)]
+            # down_seq = []
+            # for i, down_op in enumerate(down):
+            #     if i == 0:
+            #         down_seq.extend([down_op, nn.LeakyReLU(0.2)])
+            #     else:
+            #         down_seq.extend([down_op, norm_layer(out_nc), nn.LeakyReLU(0.2)])
+            # down = down_seq
+            down = [down[0], nn.LeakyReLU(0.2)]
         elif down_type == 'middle':
-            down = down + [norm_layer(out_nc)] + [nn.LeakyReLU(0.2)]
+            down_seq =[]
+            for down_op in down:
+                down_seq.extend([down_op, norm_layer(out_nc), nn.LeakyReLU(0.2)])
+            down = down_seq
         else:  # down_type == 'outer'
-            pass
+            down = [down[0], nn.LeakyReLU(0.1)]
         return nn.Sequential(*down)
 
     def upconv(self, in_nc: int, out_nc: int, up_type: str, norm_layer=nn.BatchNorm2d):
@@ -292,8 +303,12 @@ class UNetGenerator(BaseNetwork):
 
         up = [nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
         if up_type in ['inner', 'middle']:
-            up = up + [norm_layer(out_nc)] + [nn.ReLU()]
+            up = up + [norm_layer(out_nc)] + [nn.LeakyReLU(0.2)]
         else:  # up_type == 'outer'
+            # 修改最外层输出卷积操作
+            up = [nn.ConvTranspose2d(in_nc, in_nc//2, kernel_size=4, stride=2, padding=1, bias=use_bias),
+                  norm_layer(in_nc//2), nn.LeakyReLU(0.2),
+                  nn.Conv2d(in_nc//2, out_nc, kernel_size=1, stride=1, padding=0, bias=False)]
             up = up + [nn.Tanh()]
         return nn.Sequential(*up)
 

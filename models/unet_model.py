@@ -62,7 +62,7 @@ class UNetModel(Pix2PixModel):
 
         G_losses['GAN'] = self.criterionGAN(patch_fake, True, for_discriminator=False)
         G_losses['recon'] = self.opt.lambda_l1 * self.criterion_recon(fake_image, real_image)
-        G_losses['attr'] = self.criterion_attr(condition_fake, condition)
+        G_losses['G_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_fake, condition)
 
         return G_losses, fake_image
 
@@ -77,7 +77,7 @@ class UNetModel(Pix2PixModel):
 
         D_losses['D_fake'] = self.criterionGAN(patch_fake, False, for_discriminator=True)
         D_losses['D_real'] = self.criterionGAN(patch_real, True, for_discriminator=True)
-        D_losses['attr'] = self.criterion_attr(condition_real, condition)
+        D_losses['D_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_real, condition)
 
         return D_losses
 
