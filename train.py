@@ -42,9 +42,11 @@ for epoch in iter_counter.training_epochs():
         # train generator
         if i % opt.D_steps_per_G == 0:
             trainer.run_generator_one_step(data_i)
+            trainer.log_histogram(step_index=epoch * len(dataloader) + i, model_type='G')
 
         # train discriminator
         trainer.run_discriminator_one_step(data_i)
+        trainer.log_histogram(step_index=epoch * len(dataloader) + i, model_type='D')
 
         # Visualizations
         if iter_counter.needs_printing():
@@ -75,4 +77,5 @@ for epoch in iter_counter.training_epochs():
         trainer.save('latest')
         trainer.save(epoch)
 
+trainer.summary_writer.close()
 print('Training was successfully finished.')

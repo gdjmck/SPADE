@@ -2,10 +2,11 @@
 Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
-
+import os
 from models.networks.sync_batchnorm import DataParallelWithCallback
 from models.pix2pix_model import Pix2PixModel
 from models import create_model
+from torch.utils.tensorboard import SummaryWriter
 
 
 class Pix2PixTrainer():
@@ -31,6 +32,25 @@ class Pix2PixTrainer():
             self.optimizer_G, self.optimizer_D = \
                 self.pix2pix_model_on_one_gpu.create_optimizers(opt)
             self.old_lr = opt.lr
+
+        # create summary writer
+        self.summary_writer = SummaryWriter(log_dir=os.path.join(opt.checkpoints_dir, opt.name), comment='UNet')
+
+    def log_histogram(self, step_index, model_type='D'):
+        if model_type == 'D':
+            try:
+                param_iterator = self.pix2pix_model.netD.named_parameters()
+            except AttributeError:
+                param_iterator = self.pix2pix_model.module.netD.named_parameters()
+            for name, param in param_iterator:
+                self.summary_writer.add_histogram(f'{name}.grad', param.grad, step_index)
+        else:
+            try:
+                param_iterator = self.pix2pix_model.netG.named_parameters()
+            except AttributeError:
+                param_iterator = self.pix2pix_model.module.netG.named_parameters()
+            for name, param in param_iterator:
+                self.summary_writer.add_histogram(f'{name}.grad', param.grad, step_index)
 
     def run_generator_one_step(self, data):
         self.optimizer_G.zero_grad()
