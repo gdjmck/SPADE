@@ -5,6 +5,7 @@ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses
 
 import torch.nn as nn
 from torch.nn import init
+import torch.nn.utils.spectral_norm as spectral_norm
 
 
 class BaseNetwork(nn.Module):
@@ -57,3 +58,12 @@ class BaseNetwork(nn.Module):
         for m in self.children():
             if hasattr(m, 'init_weights'):
                 m.init_weights(init_type, gain)
+
+    def _apply_spectral_norm(self, layer):
+        if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.ConvTranspose2d):
+            try:
+                return spectral_norm(layer)
+            except:
+                return layer
+        else:
+            return layer

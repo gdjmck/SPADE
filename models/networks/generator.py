@@ -8,7 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import functools
 import math
-import torch.nn.utils.spectral_norm as spectral_norm
 from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
 from models.networks.architecture import ResnetBlock as ResnetBlock
@@ -272,8 +271,6 @@ class UNetGenerator(BaseNetwork):
 
         down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias),
                 nn.Conv2d(out_nc, out_nc, kernel_size=1, stride=1, padding=0)]
-        if 'spectral' in self.opt.norm_G:
-            down = [spectral_norm(down_op) for down_op in down]
         if down_type == 'inner':
             # down_seq = []
             # for i, down_op in enumerate(down):
@@ -290,6 +287,10 @@ class UNetGenerator(BaseNetwork):
             down = down_seq
         else:  # down_type == 'outer'
             down = [down[0], nn.LeakyReLU(0.1)]
+
+        if 'spectral' in self.opt.norm_G:
+            down = [self._apply_spectral_norm(layer) for layer in down]
+
         return nn.Sequential(*down)
 
     def upconv(self, in_nc: int, out_nc: int, up_type: str, norm_layer=nn.BatchNorm2d):
@@ -310,5 +311,9 @@ class UNetGenerator(BaseNetwork):
                   norm_layer(in_nc//2), nn.LeakyReLU(0.2),
                   nn.Conv2d(in_nc//2, out_nc, kernel_size=1, stride=1, padding=0, bias=False)]
             up = up + [nn.Tanh()]
+        # apply spectral_norm
+        if 'spectral' in self.opt.norm_G:
+            up = [self._apply_spectral_norm(layer) for layer in up]
+
         return nn.Sequential(*up)
 

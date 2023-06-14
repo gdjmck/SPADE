@@ -150,6 +150,9 @@ class UNetDiscriminator(BaseNetwork):
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
             head_layers += [self.conv_block(opt.ndf * nf_mult_prev, opt.ndf * nf_mult, stride=2)]
+
+        if 'spectral' in self.opt.norm_D:
+            head_layers = [self._apply_spectral_norm(layer) for layer in head_layers]
         self.head = nn.Sequential(*head_layers)
 
         # Patch Discriminator
@@ -159,6 +162,9 @@ class UNetDiscriminator(BaseNetwork):
         patch_layers += [self.conv_block(2 * opt.ndf, 4 * opt.ndf, kernel_size=3, stride=1, padding=1),
                          self.conv_block(4 * opt.ndf, 8 * opt.ndf, kernel_size=3, stride=1, padding=1)]
         patch_layers += [nn.Conv2d(8 * opt.ndf, 1, kernel_size=3, stride=1, padding=self.padw, bias=self.use_bias)]
+
+        if 'spectral' in self.opt.norm_D:
+            patch_layers = [self._apply_spectral_norm(layer) for layer in patch_layers]
         self.patch_discriminator = nn.Sequential(*patch_layers)
 
         # Regression Head
@@ -168,6 +174,9 @@ class UNetDiscriminator(BaseNetwork):
         regression_layers += [nn.Conv2d(8 * opt.ndf, 8 * opt.ndf, kernel_size=self.kw, stride=2, padding=self.padw),
                               nn.ReLU(),
                               nn.Conv2d(8 * opt.ndf, self.condition_size, kernel_size=self.kw, stride=1, padding=0)]
+
+        if 'spectral' in self.opt.norm_D:
+            regression_layers = [self._apply_spectral_norm(layer) for layer in regression_layers]
         self.regression = nn.Sequential(*regression_layers)
 
     def conv_block(self, in_nc: int, out_nc: int, stride: int, padding=None, kernel_size=None, norm_layer=nn.BatchNorm2d):
@@ -175,10 +184,9 @@ class UNetDiscriminator(BaseNetwork):
         kernel_size = kernel_size if kernel_size else self.kw
         conv = nn.Conv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride,
                          bias=self.use_bias, padding=padding)
-        # if 'spectral' in self.opt.norm_D:
-        #     conv = spectral_norm(conv)
-        # return nn.Sequential(conv, norm_layer(out_nc), nn.LeakyReLU(0.2, True))
-        return nn.Sequential(self.norm_layer(conv), nn.LeakyReLU(0.2, False))
+        if 'spectral' in self.opt.norm_D:
+            conv = self._apply_spectral_norm(conv)
+        return nn.Sequential(conv, nn.BatchNorm2d(out_nc), nn.LeakyReLU(0.2))
 
     def forward(self, input):
         """Standard forward."""
