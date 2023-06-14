@@ -267,14 +267,16 @@ class UNetGenerator(BaseNetwork):
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
+        # use_bias on
+        use_bias = True
 
         down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
         if 'spectral' in self.opt.norm_G:
             down = [spectral_norm(down[0])]
         if down_type == 'inner':
-            down = [nn.LeakyReLU(0.2)] + down
+            down = down + [nn.LeakyReLU(0.2)]
         elif down_type == 'middle':
-            down = [nn.LeakyReLU(0.2)] + down + [norm_layer(out_nc)]
+            down = down + [norm_layer(out_nc)] + [nn.LeakyReLU(0.2)]
         else:  # down_type == 'outer'
             pass
         return nn.Sequential(*down)
@@ -285,11 +287,13 @@ class UNetGenerator(BaseNetwork):
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
+        # use_bias on
+        use_bias = True
 
         up = [nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
         if up_type in ['inner', 'middle']:
-            up = [nn.ReLU()] + up + [norm_layer(out_nc)]
+            up = up + [norm_layer(out_nc)] + [nn.ReLU()]
         else:  # up_type == 'outer'
-            up = [nn.ReLU()] + up + [nn.Tanh()]
+            up = up + [nn.Tanh()]
         return nn.Sequential(*up)
 

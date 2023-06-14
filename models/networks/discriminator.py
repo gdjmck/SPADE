@@ -84,7 +84,7 @@ class NLayerDiscriminator(BaseNetwork):
 
         norm_layer = get_nonspade_norm_layer(opt, opt.norm_D)
         sequence = [[nn.Conv2d(input_nc, nf, kernel_size=kw, stride=2, padding=padw),
-                     nn.LeakyReLU(0.2, True)]]
+                     nn.LeakyReLU(0.2, False)]]
 
         for n in range(1, opt.n_layers_D):
             nf_prev = nf
