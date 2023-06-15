@@ -38,6 +38,9 @@ class UNetModel(Pix2PixModel):
 
 
     def discriminate(self, fake_image, real_image):
+        patch_fake, condition_fake = self.netD(fake_image)
+        patch_real, condition_real = self.netD(real_image)
+        return patch_fake, condition_fake, patch_real, condition_real
         fake_and_real = torch.cat([fake_image, real_image], 0)
 
         # In Batch Normalization, the fake and real images are
