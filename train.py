@@ -42,11 +42,13 @@ for epoch in iter_counter.training_epochs():
         # train generator
         if i % opt.D_steps_per_G == 0:
             trainer.run_generator_one_step(data_i)
-            trainer.log_histogram(step_index=epoch * len(dataloader) + i, model_type='G')
+            if opt.isTrain and opt.tf_log:
+                trainer.log_histogram(step_index=epoch * len(dataloader) + i, model_type='G')
 
         # train discriminator
         trainer.run_discriminator_one_step(data_i)
-        trainer.log_histogram(step_index=epoch * len(dataloader) + i, model_type='D')
+        if opt.isTrain and opt.tf_log:
+            trainer.log_histogram(step_index=epoch * len(dataloader) + i, model_type='D')
 
         # Visualizations
         if iter_counter.needs_printing():
