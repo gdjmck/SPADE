@@ -200,9 +200,11 @@ class UNetGenerator(BaseNetwork):
         self.condition_size = opt.condition_size  # default: 5
         self.down_seq = []
         self.up_seq = []  # 最后做reverse
+        norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_G)
         # UNet最外层
         self.down_seq.append(self.downconv(opt.input_nc, self.ngf, 'outer', norm_layer=norm_layer))
         self.up_seq.append(self.upconv(2 * self.ngf, opt.output_nc, 'outer', norm_layer=norm_layer))
+        norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_G)
         # UNet中间层（特征深度有变化）
         for i in range(3):
             # outer_nc = ngf; inner_nc = 2*ngf; input_nc = ngf
@@ -269,8 +271,8 @@ class UNetGenerator(BaseNetwork):
         # use_bias on
         use_bias = True
 
-        down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias),
-                nn.Conv2d(out_nc, out_nc, kernel_size=1, stride=1, padding=0)]
+        down = [norm_layer(nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)),
+                norm_layer(nn.Conv2d(out_nc, out_nc, kernel_size=1, stride=1, padding=0))]
         if down_type == 'inner':
             # down_seq = []
             # for i, down_op in enumerate(down):
@@ -279,17 +281,17 @@ class UNetGenerator(BaseNetwork):
             #     else:
             #         down_seq.extend([down_op, norm_layer(out_nc), nn.LeakyReLU(0.2)])
             # down = down_seq
-            down = [down[0], nn.LeakyReLU(0.2)]
+            down = [nn.MaxPool2d(2), nn.LeakyReLU(0.2)]
         elif down_type == 'middle':
-            down_seq =[]
+            down_seq = []
             for down_op in down:
-                down_seq.extend([down_op, norm_layer(out_nc), nn.LeakyReLU(0.2)])
+                down_seq.extend([down_op, nn.LeakyReLU(0.2)])
             down = down_seq
         else:  # down_type == 'outer'
             down = [down[0], nn.LeakyReLU(0.1)]
 
-        if 'spectral' in self.opt.norm_G:
-            down = [self._apply_spectral_norm(layer) for layer in down]
+        # if 'spectral' in self.opt.norm_G:
+        #     down = [self._apply_spectral_norm(layer) for layer in down]
 
         return nn.Sequential(*down)
 
@@ -302,18 +304,18 @@ class UNetGenerator(BaseNetwork):
         # use_bias on
         use_bias = True
 
-        up = [nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)]
+        up = [norm_layer(nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias))]
         if up_type in ['inner', 'middle']:
-            up = up + [norm_layer(out_nc)] + [nn.LeakyReLU(0.2)]
+            up = up + [nn.LeakyReLU(0.2)]
         else:  # up_type == 'outer'
             # 修改最外层输出卷积操作
-            up = [nn.ConvTranspose2d(in_nc, in_nc//2, kernel_size=4, stride=2, padding=1, bias=use_bias),
-                  norm_layer(in_nc//2), nn.LeakyReLU(0.2),
-                  nn.Conv2d(in_nc//2, out_nc, kernel_size=1, stride=1, padding=0, bias=False)]
+            up = [norm_layer(nn.ConvTranspose2d(in_nc, in_nc//2, kernel_size=4, stride=2, padding=1, bias=use_bias)),
+                  nn.LeakyReLU(0.2),
+                  norm_layer(nn.Conv2d(in_nc//2, out_nc, kernel_size=1, stride=1, padding=0, bias=False))]
             up = up + [nn.Tanh()]
-        # apply spectral_norm
-        if 'spectral' in self.opt.norm_G:
-            up = [self._apply_spectral_norm(layer) for layer in up]
+        # # apply spectral_norm
+        # if 'spectral' in self.opt.norm_G:
+        #     up = [self._apply_spectral_norm(layer) for layer in up]
 
         return nn.Sequential(*up)
 

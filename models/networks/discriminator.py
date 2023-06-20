@@ -11,6 +11,7 @@ from models.networks.normalization import get_nonspade_norm_layer
 import torch.nn.utils.spectral_norm as spectral_norm
 import util.util as util
 import functools
+import math
 
 
 class MultiscaleDiscriminator(BaseNetwork):
@@ -140,7 +141,8 @@ class UNetDiscriminator(BaseNetwork):
         self.kw = 4
         self.padw = 1
         self.condition_size = opt.condition_size  # 回归值的个数
-        self.norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_D)
+        norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_D)
+        # self.norm_layer = norm_layer
 
         # 共同特征提取头
         head_layers = [nn.Conv2d(opt.input_nc, opt.ndf, kernel_size=self.kw, stride=2, padding=self.padw),
@@ -149,7 +151,7 @@ class UNetDiscriminator(BaseNetwork):
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
-            head_layers += [self.conv_block(opt.ndf * nf_mult_prev, opt.ndf * nf_mult, stride=2)]
+            head_layers += [self.conv_block(opt.ndf * nf_mult_prev, opt.ndf * nf_mult, stride=2, norm_layer=norm_layer)]
 
         if 'spectral' in self.opt.norm_D:
             head_layers = [self._apply_spectral_norm(layer) for layer in head_layers]
@@ -159,8 +161,9 @@ class UNetDiscriminator(BaseNetwork):
         patch_layers = []
         # channel 2*ndf -> 4*ndf, keeps spatial dimension
         # channel 4*ndf -> 8*ndf, keeps spatial dimension
-        patch_layers += [self.conv_block(2 * opt.ndf, 4 * opt.ndf, kernel_size=3, stride=1, padding=1),
-                         self.conv_block(4 * opt.ndf, 8 * opt.ndf, kernel_size=3, stride=1, padding=1)]
+        patch_layers += [
+            self.conv_block(2 * opt.ndf, 4 * opt.ndf, kernel_size=3, stride=1, padding=1, norm_layer=norm_layer),
+            self.conv_block(4 * opt.ndf, 8 * opt.ndf, kernel_size=3, stride=1, padding=1, norm_layer=norm_layer)]
         patch_layers += [nn.Conv2d(8 * opt.ndf, 1, kernel_size=3, stride=1, padding=self.padw, bias=self.use_bias)]
 
         if 'spectral' in self.opt.norm_D:
@@ -179,14 +182,19 @@ class UNetDiscriminator(BaseNetwork):
             regression_layers = [self._apply_spectral_norm(layer) for layer in regression_layers]
         self.regression = nn.Sequential(*regression_layers)
 
-    def conv_block(self, in_nc: int, out_nc: int, stride: int, padding=None, kernel_size=None, norm_layer=nn.BatchNorm2d):
+    def conv_block(self, in_nc: int, out_nc: int, stride: int, padding=None, kernel_size=None,
+                   norm_layer=nn.BatchNorm2d):
         padding = padding if padding else self.padw
         kernel_size = kernel_size if kernel_size else self.kw
         conv = nn.Conv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride,
                          bias=self.use_bias, padding=padding)
-        if 'spectral' in self.opt.norm_D:
-            conv = self._apply_spectral_norm(conv)
-        return nn.Sequential(conv, nn.BatchNorm2d(out_nc), nn.LeakyReLU(0.2))
+        # if 'spectral' in self.opt.norm_D:
+        #     conv = self._apply_spectral_norm(conv)
+        try:
+            conv = norm_layer(conv)
+        except:
+            pass
+        return nn.Sequential(conv, nn.LeakyReLU(0.2))
 
     def forward(self, input):
         """Standard forward."""
@@ -199,6 +207,68 @@ class UNetDiscriminator(BaseNetwork):
         else:
             condition_regression = None
         return discrimination, condition_regression
+
+
+class NLayerRegressHeadDiscriminator(BaseNetwork):
+    def __init__(self, opt, n_layers=3, norm_layer=nn.InstanceNorm2d):
+        super(NLayerRegressHeadDiscriminator, self).__init__()
+        self.opt = opt
+        self.use_sigmoid = False
+        self.n_layers = n_layers
+
+        self.kw = 4
+        self.padw = int(np.ceil((self.kw - 1.0) / 2))
+        input_nc = opt.input_nc + opt.label_nc
+        if opt.contain_dontcare_label:
+            input_nc += 1
+        sequence = [[nn.Conv2d(input_nc, opt.ndf, kernel_size=self.kw, stride=2, padding=self.padw), nn.LeakyReLU(0.2, True)]]
+
+        ndf = opt.ndf
+        nf = opt.ndf
+        for n in range(1, n_layers):
+            nf_prev = nf
+            nf = min(nf * 2, 512)
+            sequence += [[
+                nn.Conv2d(nf_prev, nf, kernel_size=self.kw, stride=2, padding=self.padw),
+                norm_layer(nf), nn.LeakyReLU(0.2, True)
+            ]]
+
+        nf_prev = nf
+        nf = min(nf * 2, 512)
+        sequence += [[
+            nn.Conv2d(nf_prev, nf, kernel_size=self.kw, stride=1, padding=self.padw),
+            norm_layer(nf),
+            nn.LeakyReLU(0.2, True)
+        ]]
+
+        sequence_stream = []
+        for n in range(len(sequence)):
+            sequence_stream += sequence[n]
+        self.head = nn.Sequential(*sequence_stream)
+        self.tail = nn.Conv2d(nf, 1, kernel_size=self.kw, stride=1, padding=self.padw)
+
+        # 回归分支
+        self.regression = []
+        for i in range(2):
+            self.regression += [nn.Conv2d(math.ceil(8 * ndf / 2 ** i), math.ceil(4 * ndf / 2 ** i),
+                                          kernel_size=self.kw, stride=2, padding=self.padw),
+                                nn.LeakyReLU(0.2, True)]
+        self.regression += [nn.AdaptiveAvgPool2d(1)]
+        self.regression = nn.Sequential(*self.regression)
+        self.linear = nn.Linear(2 * ndf, opt.condition_size)
+
+    def forward(self, input):
+        """
+        Return:
+            disc_out: 鉴别器输出
+            regress_out：回归头输出
+        """
+        feat = self.head(input)
+        disc_out = self.tail(feat)
+        regress_out = self.regression(feat)
+        batchSize = regress_out.size(0)
+        regress_out = self.linear(regress_out.view(batchSize, -1))
+        return disc_out, regress_out
 
 
 if __name__ == '__main__':
