@@ -3,21 +3,31 @@ import cv2
 import math
 import glob
 import shutil
+import json
 import numpy as np
+import geopandas as gpd
 import matplotlib.pyplot as plt
+from pyproj import CRS
 from shapely.geometry import Polygon, LineString
 from shapely.affinity import scale, translate
 from geopandas import GeoSeries
 from PIL import Image
+from util.geo_util import coord_to_longtitude
 
 
 def extract_outloop(img):
+    def get_area(pts):
+        try:
+            return Polygon(pts).area
+        except ValueError:
+            return 0
+
     contour, hierachy = cv2.findContours(cv2.threshold(img, 250, 1, cv2.THRESH_BINARY_INV)[1],
                                          cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if hierachy.shape[1] > 1:  # 有多个轮廓
         contour = [c for c in contour if c.shape[0] > 2]  # 去除 点与线
         if len(contour) > 1:  # 只保留面积最大的
-            contour = max(contour, key=lambda pts: Polygon(pts).area)
+            contour = max(contour, key=lambda pts: get_area(pts))
     #     assert hierachy.shape[1] == 1, "找轮廓时可能由于外轮廓不连续，导致有多个"
     contour = np.array(contour).reshape(-1, 2).tolist()
     if contour[0] != contour[-1]:
@@ -150,7 +160,7 @@ class PostProcess:
 
         return loop
 
-    def to_output(self, real_center, standard_size):
+    def to_output(self, real_center, standard_size, coord2longlat=False):
         """
         构造返回数据
         """
@@ -167,6 +177,9 @@ class PostProcess:
             outloop_ls = scale(translate(outloop_ls, **bias_dict),
                                scaler, scaler, origin=list(real_center)+[0.0])
             outloop[i] = np.array(outloop_ls.coords).tolist()
+            if coord2longlat:
+                # 坐标转回经纬度
+                outloop[i] = [coord_to_longtitude(*coord) for coord in outloop[i]]
         # # 把生成的地块轮廓也加上
         # field_outloop = scale(translate(self.field_loop, **bias_dict), scaler, scaler, origin=list(real_center)+[0.0])
         # print('生成的地块轮廓重心:{}'.format(Polygon(field_outloop).centroid))
@@ -248,6 +261,27 @@ class PostProcess:
         ax = plt.gca()
         ax.invert_yaxis()
         GeoSeries([self.field_loop] + [LineString(build) for build in self.building_list]).plot(ax=ax)
+
+
+def to_geojson(data: dict):
+    """
+    排楼结果转成shp文件
+    :param layout_result: json 路径
+    :param shpfiles_dir: 存储shp文件位置
+    :param shpfiles_name:shp名字
+    :return:
+    """
+    geo = {
+        'geometry': [Polygon(outloop) for outloop in data['outloop']],
+        'floor': data['floor']
+    }
+
+    s = gpd.GeoDataFrame(geo, crs="EPSG:3857")
+    # 定义目标坐标系
+    target_crs = CRS.from_epsg(4326)
+    # 将原始数据集的坐标系转换为目标坐标系
+    s = s.to_crs(target_crs)
+    return json.loads(s.to_json())
 
 
 if __name__ == '__main__':

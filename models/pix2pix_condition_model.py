@@ -8,6 +8,8 @@ class Pix2PixConditionModel(Pix2PixModel):
         super(Pix2PixConditionModel, self).__init__(opt)
         # blender for code & condition
         self.blender = nn.Linear(256+opt.condition_size, 256)
+        if self.use_gpu():
+            self.blender.cuda()
         if opt.isTrain:
             self.criterion_attr = torch.nn.MSELoss()
 
@@ -27,7 +29,10 @@ class Pix2PixConditionModel(Pix2PixModel):
 
     def preprocess_input(self, data):
         data_processed = super(Pix2PixConditionModel, self).preprocess_input(data)
-        return list(data_processed[:-1]) + [data.get('condition', None)]
+        condition = data.get('condition', None)
+        if condition is not None:
+            condition = condition.to(data_processed[0].device)
+        return list(data_processed[:-1]) + [condition]
 
     def discriminate(self, input_semantics, fake_image, real_image):
         fake_concat = torch.cat([input_semantics, fake_image], dim=1)
@@ -141,7 +146,8 @@ class Pix2PixConditionModel(Pix2PixModel):
             return mu, logvar
         elif mode == 'inference':
             with torch.no_grad():
-                fake_image, _ = self.generate_fake(input_semantics, real_image)
-            return fake_image
+                fake_image, _ = self.generate_fake(input_semantics, real_image, condition=condition)
+                _, condition_fake, _, condition_real = self.discriminate(input_semantics, fake_image, real_image)
+            return fake_image, condition_fake, condition_real
         else:
             raise ValueError("|mode| is invalid")

@@ -75,9 +75,13 @@ class Condition:
                     floor_obj_map[floor].append(contour)
         return floor_obj_map
 
-    def extract_outloop(self, img):
-        contour, hierachy = cv2.findContours(cv2.threshold(img, 250, 1, cv2.THRESH_BINARY_INV)[1],
-                                                          cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    def extract_outloop(self, img, type_flag='real'):
+        if type_flag == 'real':
+            img_binary = cv2.threshold(img, 250, 1, cv2.THRESH_BINARY_INV)[1]
+        else:
+            img_binary = cv2.adaptiveThreshold(img, 255, adaptiveMethod=cv2.ADAPTIVE_THRESH_MEAN_C,
+                                               thresholdType=cv2.THRESH_BINARY_INV, blockSize=25, C=5)
+        contour, hierachy = cv2.findContours(img_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if hierachy.shape[1] > 1:  # 有多个轮廓
             contour = [c for c in contour if c.shape[0] > 2]  # 去除 点与线
             if len(contour) > 1:  # 只保留面积最大的
@@ -88,7 +92,7 @@ class Condition:
             contour.append(contour[0])
         return contour
 
-    def cal_condition(self, file):
+    def cal_condition(self, file, real_flag=True):
         """
         计算 [地块大小, 平均建筑层数, 地块密度, 建筑数量, 容积率]
         """
@@ -97,7 +101,7 @@ class Condition:
             img = img[..., 0]
         build_info = self.parse_image(img)
         # 根据解析结果计算容积率
-        field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2))
+        field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2)) * self.MAX_AREA / img.shape[0] / img.shape[1]
         volume_area = 0  # 计容面积
         cover_area = 0  # 占地面积
         num_builds = 0  # 建筑数量
@@ -133,3 +137,6 @@ class Condition:
             condition = (np.array(condition) - self.condition_mean) / self.condition_stdvar
             self.condition_dict[file] = condition
             return condition
+
+    def read_condition(self, input_list: list):
+        return (np.array(input_list) * self.condition_stdvar + self.condition_mean).astype(np.float32)
