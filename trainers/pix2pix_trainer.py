@@ -60,6 +60,16 @@ class Pix2PixTrainer():
                     # print('{} got no param'.format(name))
                     pass
 
+    def log_loss(self, loss_dict: dict, step_index: int, phase: str):
+        """
+        tensorboard记录损失值
+        :param loss_dict: 损失字典
+        :param step_index: 全局步数
+        :param phase: 训练阶段，[G, D, E]
+        :return:
+        """
+        self.summary_writer.add_scalars(main_tag=phase, tag_scalar_dict=loss_dict, global_step=step_index)
+
     def run_generator_one_step(self, data):
         self.optimizer_G.zero_grad()
         g_losses, generated = self.pix2pix_model(data, mode='generator')
