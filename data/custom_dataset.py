@@ -17,7 +17,8 @@ class CustomDataset(Pix2pixDataset):
     def modify_commandline_options(parser, is_train):
         parser = Pix2pixDataset.modify_commandline_options(parser, is_train)
         parser.set_defaults(preprocess_mode='resize_and_crop')
-        load_size = 286 if is_train else 256
+        # load_size = 286 if is_train else 256
+        load_size = 256
         parser.set_defaults(load_size=load_size)
         parser.set_defaults(crop_size=256)
         parser.set_defaults(display_winsize=256)

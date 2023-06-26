@@ -20,6 +20,7 @@ class Condition:
         self.floor_choice = [1+i*3 for i in range(11)]  # 采样层数 [1, 4, 7, ..., 31]
         self.MAX_AREA = 90000
         self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}  # 层数与颜色的映射
+        self.STANDARD_SIZE = 512
 
     def update_mean_and_stdvar(self):
         """
@@ -99,6 +100,9 @@ class Condition:
         img = cv2.imread(file)
         if len(img.shape) == 3:
             img = img[..., 0]
+        if img.shape[0] != self.STANDARD_SIZE:
+            fx = fy = self.STANDARD_SIZE / img.shape[0]
+            img = cv2.resize(img, dsize=None, fx=fx, fy=fy)
         build_info = self.parse_image(img)
         # 根据解析结果计算容积率
         field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2))
