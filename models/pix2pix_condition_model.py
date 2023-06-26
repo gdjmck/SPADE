@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from .pix2pix_model import Pix2PixModel
 import util.util as util
+from util.image_pool import ImagePool
 
 class Pix2PixConditionModel(Pix2PixModel):
     def __init__(self, opt):
@@ -12,6 +13,7 @@ class Pix2PixConditionModel(Pix2PixModel):
             self.blender.cuda()
         if opt.isTrain:
             self.criterion_attr = torch.nn.MSELoss()
+            self.image_pool = ImagePool(opt.pool_size)
 
     def generate_fake(self, input_semantics, real_image, compute_kld_loss=False, condition=None):
         assert self.opt.use_vae
@@ -56,9 +58,13 @@ class Pix2PixConditionModel(Pix2PixModel):
 
     def compute_generator_loss(self, input_semantics, real_image, condition=None):
         G_losses = {}
-
-        fake_image, KLD_loss = self.generate_fake(
-            input_semantics, real_image, self.opt.use_vae, condition)
+        if self.opt.pool_size > 0:
+            real_image_for_vae = self.image_pool.query(real_image)
+            fake_image, KLD_loss = self.generate_fake(
+                input_semantics, real_image_for_vae, self.opt.use_vae, condition)
+        else:
+            fake_image, KLD_loss = self.generate_fake(
+                input_semantics, real_image, self.opt.use_vae, condition)
 
         if self.opt.use_vae:
             G_losses['KLD'] = KLD_loss
