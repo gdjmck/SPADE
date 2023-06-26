@@ -7,13 +7,19 @@ from util.image_pool import ImagePool
 class Pix2PixConditionModel(Pix2PixModel):
     def __init__(self, opt):
         super(Pix2PixConditionModel, self).__init__(opt)
-        # blender for code & condition
-        self.blender = nn.Linear(256+opt.condition_size, 256)
+
         if self.use_gpu():
             self.blender.cuda()
         if opt.isTrain:
             self.criterion_attr = torch.nn.MSELoss()
             self.image_pool = ImagePool(opt.pool_size)
+
+    def initialize_networks(self, opt):
+        super(Pix2PixConditionModel, self).initialize_networks(opt)
+        # blender for code & condition
+        self.blender = nn.Linear(256+opt.condition_size, 256)
+        if not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate):
+            self.blender = util.load_network(self.blender, 'blender', opt.which_epoch, opt)
 
     def generate_fake(self, input_semantics, real_image, compute_kld_loss=False, condition=None):
         assert self.opt.use_vae
@@ -157,3 +163,9 @@ class Pix2PixConditionModel(Pix2PixModel):
             return fake_image, condition_fake, condition_real
         else:
             raise ValueError("|mode| is invalid")
+        
+    def save(self, epoch):
+        super(Pix2PixConditionModel, self).save()
+        # additional blender
+        util.save_network(self.blender, 'blender', epoch, self.opt)
+        

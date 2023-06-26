@@ -23,7 +23,9 @@ class Pix2PixModel(torch.nn.Module):
         self.ByteTensor = torch.cuda.ByteTensor if self.use_gpu() \
             else torch.ByteTensor
 
-        self.netG, self.netD, self.netE = self.initialize_networks(opt)
+        # init self.netG, self.netE, self.netD
+        self.netG = self.netE = self.netD = None
+        self.initialize_networks(opt)
 
         # set loss functions
         if opt.isTrain:
@@ -97,14 +99,16 @@ class Pix2PixModel(torch.nn.Module):
         netD = networks.define_D(opt) if opt.isTrain else None
         netE = networks.define_E(opt) if opt.use_vae else None
 
-        if not opt.isTrain or opt.continue_train:  # or opt.isValidate
+        if not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate):
             netG = util.load_network(netG, 'G', opt.which_epoch, opt)
             if opt.isTrain:
                 netD = util.load_network(netD, 'D', opt.which_epoch, opt)
             if opt.use_vae:
                 netE = util.load_network(netE, 'E', opt.which_epoch, opt)
 
-        return netG, netD, netE
+        self.netG = netG
+        self.netD = netD
+        self.netE = netE
 
     # preprocess the input, such as moving the tensors to GPUs and
     # transforming the label map to one-hot encoding
