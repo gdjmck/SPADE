@@ -101,7 +101,7 @@ class Condition:
             img = img[..., 0]
         build_info = self.parse_image(img)
         # 根据解析结果计算容积率
-        field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2)) * self.MAX_AREA / img.shape[0] / img.shape[1]
+        field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2))
         volume_area = 0  # 计容面积
         cover_area = 0  # 占地面积
         num_builds = 0  # 建筑数量
