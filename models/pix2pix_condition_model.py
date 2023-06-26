@@ -165,7 +165,7 @@ class Pix2PixConditionModel(Pix2PixModel):
             raise ValueError("|mode| is invalid")
         
     def save(self, epoch):
-        super(Pix2PixConditionModel, self).save()
+        super(Pix2PixConditionModel, self).save(epoch)
         # additional blender
         util.save_network(self.blender, 'blender', epoch, self.opt)
         
