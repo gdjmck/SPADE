@@ -100,6 +100,9 @@ class Pix2PixConditionModel(Pix2PixModel):
             G_losses['GAN_Feat'] = GAN_Feat_loss
 
         if not self.opt.no_vgg_loss:
+            if fake_image.size(1) == 1:
+                fake_image = torch.cat([fake_image]*3, 1)
+                real_image = torch.cat([real_image]*3, 1)
             G_losses['VGG'] = self.criterionVGG(fake_image, real_image) \
                               * self.opt.lambda_vgg
 
