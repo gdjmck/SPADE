@@ -86,7 +86,8 @@ class Pix2PixConditionModel(Pix2PixModel):
 
         if self.opt.L1_loss:
             fg_mask = input_semantics[:, :1]
-            G_losses['L1'] = self.opt.lambda_l1 * self.L1(fake_image * fg_mask, real_image * fg_mask)
+            G_losses['L1'] = (self.L1(fake_image, real_image) * fg_mask).sum() / fg_mask.sum()
+            # G_losses['L1'] = self.opt.lambda_l1 * self.L1(fake_image * fg_mask, real_image * fg_mask)
 
         if not self.opt.no_ganFeat_loss:
             num_D = len(patch_fake)

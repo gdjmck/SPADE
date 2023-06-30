@@ -39,7 +39,7 @@ class Pix2PixModel(torch.nn.Module):
             if opt.use_vae:
                 self.KLDLoss = networks.KLDLoss()
             if opt.L1_loss:
-                self.L1 = self.criterionFeat
+                self.L1 = torch.nn.L1Loss(reduction='none')
 
     # Entry point for all calls involving forward pass
     # of deep networks. We used this approach since DataParallel module
