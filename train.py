@@ -44,7 +44,7 @@ for epoch in iter_counter.training_epochs():
             trainer.run_generator_one_step(data_i)
             if opt.isTrain and opt.tf_log:
                 trainer.log_histogram(step_index=epoch * len(dataloader) + i, model_type='G')
-        trainer.log_loss(loss_dict=trainer.g_losses, step_index=epoch * len(dataloader) + i, phase='G')
+            trainer.log_loss(loss_dict=trainer.g_losses, step_index=epoch * len(dataloader) + i, phase='G')
 
         # train discriminator
         trainer.run_discriminator_one_step(data_i)

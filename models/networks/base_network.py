@@ -3,6 +3,7 @@ Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
 
+import torch
 import torch.nn as nn
 from torch.nn import init
 import torch.nn.utils.spectral_norm as spectral_norm
@@ -67,3 +68,16 @@ class BaseNetwork(nn.Module):
                 return layer
         else:
             return layer
+
+    def _compute_gram_matrix(self, feature):
+        # Flatten the input feature maps
+        b, c, h, w = feature.size()
+        features = feature.view(b * c, h * w)
+
+        # Compute the Gram matrix
+        gram = torch.matmul(features, features.t())
+
+        # Normalize the Gram matrix by dividing by the number of elements
+        gram = gram / (b * c * h * w)
+
+        return gram

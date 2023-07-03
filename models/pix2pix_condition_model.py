@@ -7,7 +7,7 @@ from util.image_pool import ImagePool
 class Pix2PixConditionModel(Pix2PixModel):
     def __init__(self, opt):
         super(Pix2PixConditionModel, self).__init__(opt)
-
+        self.gram_matrix_loss = nn.MSELoss()
         if self.use_gpu():
             self.blender.cuda()
         if opt.isTrain:
@@ -25,6 +25,7 @@ class Pix2PixConditionModel(Pix2PixModel):
         assert self.opt.use_vae
         z = None
         KLD_loss = None
+        gram_matrix_loss = None
         # 条件融合
         z, mu, logvar = self.encode_z(real_image)
         if condition is not None:
@@ -32,8 +33,11 @@ class Pix2PixConditionModel(Pix2PixModel):
             z = self.blender(z)
             if compute_kld_loss:
                 KLD_loss = self.KLDLoss(mu, logvar) * self.opt.lambda_kld
-        fake_image = self.netG(input_semantics, z=z)
-        return fake_image, KLD_loss
+        if self.opt.gram_matrix_loss:
+            fake_image, gram_matrix = self.netG(input_semantics, z=z, return_gram=True)
+        else:
+            fake_image = self.netG(input_semantics, z=z)
+        return fake_image, KLD_loss, gram_matrix
 
     def preprocess_input(self, data):
         data_processed = super(Pix2PixConditionModel, self).preprocess_input(data)
@@ -66,10 +70,10 @@ class Pix2PixConditionModel(Pix2PixModel):
         G_losses = {}
         if self.opt.pool_size > 0:
             real_image_for_vae = self.image_pool.query(real_image)
-            fake_image, KLD_loss = self.generate_fake(
+            fake_image, KLD_loss, gram_matrix = self.generate_fake(
                 input_semantics, real_image_for_vae, self.opt.use_vae, condition)
         else:
-            fake_image, KLD_loss = self.generate_fake(
+            fake_image, KLD_loss, gram_matrix = self.generate_fake(
                 input_semantics, real_image, self.opt.use_vae, condition)
 
         if self.opt.use_vae:
@@ -88,6 +92,13 @@ class Pix2PixConditionModel(Pix2PixModel):
             fg_mask = input_semantics[:, :1]
             G_losses['L1'] = (self.L1(fake_image, real_image) * fg_mask).sum() / fg_mask.sum()
             # G_losses['L1'] = self.opt.lambda_l1 * self.L1(fake_image * fg_mask, real_image * fg_mask)
+
+        if self.opt.gram_matrix_loss:
+            # generator should outputs more than image but features form intermediate layers
+            with torch.no_grad():
+                # 用第二次forward作为参考，相似于对比学习
+                _, _, gram_matrix_fix = self.generate_fake(input_semantics, real_image, self.opt.use_vae, condition)
+            G_losses['gram_matrix'] = self.opt.lambda_gram * self.gram_matrix_loss(gram_matrix, gram_matrix_fix)
 
         if not self.opt.no_ganFeat_loss:
             num_D = len(patch_fake)
@@ -129,7 +140,7 @@ class Pix2PixConditionModel(Pix2PixModel):
     def compute_discriminator_loss(self, input_semantics, real_image, condition):
         D_losses = {}
         with torch.no_grad():
-            fake_image, _ = self.generate_fake(input_semantics, real_image, condition)
+            fake_image, _, _ = self.generate_fake(input_semantics, real_image, condition)
             fake_image = fake_image.detach()
             fake_image.requires_grad_()
 

@@ -31,6 +31,9 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--total_variation_loss', action='store_true', help='Use total variation loss')
         parser.add_argument('--L1_loss', action='store_true', help='Use L1 loss for generated image and real image')
         parser.add_argument('--pool_size', type=int, default=0, help='history pool for VAE input')
+        parser.add_argument('--gram_matrix_loss', action='store_true', help='compute MSE loss between gram matrix')
+        parser.add_argument('--lambda_gram', type=float, default=100000.0)
+        parser.add_argument('--lambda_l1', type=float, default=1.0)
 
         # the default values for beta1 and beta2 differ by TTUR option
         opt, _ = parser.parse_known_args()
@@ -52,6 +55,5 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--gan_mode', type=str, default='hinge', help='(ls|original|hinge)')
         parser.add_argument('--netD', type=str, default='multiscale', help='(n_layers|multiscale|image)')
         parser.add_argument('--lambda_kld', type=float, default=0.05)
-        parser.add_argument('--lambda_l1', type=float, default=1.0)
         self.isTrain = True
         return parser

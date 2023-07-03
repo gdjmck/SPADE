@@ -17,7 +17,8 @@ from models.networks.architecture import SPADEResnetBlock as SPADEResnetBlock
 class SPADEGenerator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
-        parser.set_defaults(norm_G='spectralspadesyncbatch3x3')
+        # parser.set_defaults(norm_G='spectralspadesyncbatch3x3')
+        parser.set_defaults(norm_G='spectralspadeinstance3x3')
         parser.add_argument('--num_upsampling_layers',
                             choices=('normal', 'more', 'most'), default='normal',
                             help="If 'more', adds upsampling layer between the two middle resnet blocks. If 'most', also add one more upsampling + resnet layer at the end of the generator")
@@ -78,7 +79,7 @@ class SPADEGenerator(BaseNetwork):
 
         return sw, sh
 
-    def forward(self, input, z=None):
+    def forward(self, input, z=None, return_gram=False):
         seg = input
 
         if self.opt.use_vae:
@@ -117,11 +118,18 @@ class SPADEGenerator(BaseNetwork):
             x = self.up(x)
             x = self.up_4(x, seg)
 
+        # gram matrix adds here
+        if return_gram:
+            gram_matrix = self._compute_gram_matrix(x)
+
         x = self.conv_img(F.leaky_relu(x, 2e-1))
         if not self.opt.classify_color:
             x = F.tanh(x)
 
-        return x
+        if return_gram:
+            return x, gram_matrix
+        else:
+            return x
 
 
 class Pix2PixHDGenerator(BaseNetwork):
