@@ -3,6 +3,7 @@ import torch.nn as nn
 from .pix2pix_model import Pix2PixModel
 import util.util as util
 from util.image_pool import ImagePool
+from util.DiffAugment_pytorch import DiffAugment
 
 class Pix2PixConditionModel(Pix2PixModel):
     def __init__(self, opt):
@@ -13,6 +14,8 @@ class Pix2PixConditionModel(Pix2PixModel):
         if opt.isTrain:
             self.criterion_attr = torch.nn.MSELoss()
             self.image_pool = ImagePool(opt.pool_size)
+        if opt.diff_aug:
+            self.policy = 'color,translation,cutout'
 
     def initialize_networks(self, opt):
         super(Pix2PixConditionModel, self).initialize_networks(opt)
@@ -25,7 +28,7 @@ class Pix2PixConditionModel(Pix2PixModel):
         assert self.opt.use_vae
         z = None
         KLD_loss = None
-        gram_matrix_loss = None
+        gram_matrix = None
         # 条件融合
         z, mu, logvar = self.encode_z(real_image)
         if condition is not None:
@@ -79,7 +82,13 @@ class Pix2PixConditionModel(Pix2PixModel):
         if self.opt.use_vae:
             G_losses['KLD'] = KLD_loss
 
-        patch_fake, condition_fake, _, _ = self.discriminate(input_semantics, fake_image, real_image)
+        if self.opt.diff_aug:
+            # differentiable augmentation before passing into discriminator
+            patch_fake, condition_fake, _, _ = self.discriminate(input_semantics,
+                                                                 DiffAugment(fake_image, policy=self.policy),
+                                                                 DiffAugment(real_image, policy=self.policy))
+        else:
+            patch_fake, condition_fake, _, _ = self.discriminate(input_semantics, fake_image, real_image)
 
         # maximize pred_fake
         G_losses['GAN'] = self.criterionGAN(patch_fake, True, for_discriminator=False)
@@ -144,6 +153,10 @@ class Pix2PixConditionModel(Pix2PixModel):
             fake_image = fake_image.detach()
             fake_image.requires_grad_()
 
+        if self.opt.diff_aug:
+            fake_image = DiffAugment(fake_image, policy=self.policy)
+            real_image = DiffAugment(real_image, policy=self.policy)
+
         patch_fake, _, patch_real, condition_real = self.discriminate(
             input_semantics, fake_image, real_image)
 
@@ -174,7 +187,7 @@ class Pix2PixConditionModel(Pix2PixModel):
             return mu, logvar
         elif mode == 'inference':
             with torch.no_grad():
-                fake_image, _ = self.generate_fake(input_semantics, real_image, condition=condition)
+                fake_image, _, _ = self.generate_fake(input_semantics, real_image, condition=condition)
                 _, condition_fake, _, condition_real = self.discriminate(input_semantics, fake_image, real_image)
             return fake_image, condition_fake, condition_real
         else:
