@@ -5,6 +5,7 @@ import util.util as util
 from util.image_pool import ImagePool
 from util.DiffAugment_pytorch import DiffAugment
 
+
 class Pix2PixConditionModel(Pix2PixModel):
     def __init__(self, opt):
         super(Pix2PixConditionModel, self).__init__(opt)
@@ -12,15 +13,17 @@ class Pix2PixConditionModel(Pix2PixModel):
         if self.use_gpu():
             self.blender.cuda()
         if opt.isTrain:
-            self.criterion_attr = torch.nn.MSELoss()
+            self.criterion_attr = torch.nn.MSELoss(reduction='none')
             self.image_pool = ImagePool(opt.pool_size)
         if opt.diff_aug:
             self.policy = 'color,translation,cutout'
+        if opt.condition_size:
+            self.condition_weight = self.FloatTensor([[1.0, 10.0, 10.0, 2.0, 10.0]])
 
     def initialize_networks(self, opt):
         super(Pix2PixConditionModel, self).initialize_networks(opt)
         # blender for code & condition
-        self.blender = nn.Linear(256+opt.condition_size, 256)
+        self.blender = nn.Linear(256 + opt.condition_size, 256)
         if not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate):
             self.blender = util.load_network(self.blender, 'blender', opt.which_epoch, opt)
 
@@ -93,9 +96,9 @@ class Pix2PixConditionModel(Pix2PixModel):
         # maximize pred_fake
         G_losses['GAN'] = self.criterionGAN(patch_fake, True, for_discriminator=False)
 
-
         if self.opt.condition_size:
-            G_losses['G_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_fake, condition)
+            G_losses['G_attr'] = torch.mean(
+                self.opt.lambda_attr * self.criterion_attr(condition_fake, condition) * self.condition_weight)
 
         if self.opt.L1_loss:
             fg_mask = input_semantics[:, :1]
@@ -123,8 +126,8 @@ class Pix2PixConditionModel(Pix2PixModel):
 
         if not self.opt.no_vgg_loss:
             if fake_image.size(1) == 1:
-                fake_image = torch.cat([fake_image]*3, 1)
-                real_image = torch.cat([real_image]*3, 1)
+                fake_image = torch.cat([fake_image] * 3, 1)
+                real_image = torch.cat([real_image] * 3, 1)
             G_losses['VGG'] = self.criterionVGG(fake_image, real_image) \
                               * self.opt.lambda_vgg
 
@@ -167,7 +170,8 @@ class Pix2PixConditionModel(Pix2PixModel):
         D_losses['D_real'] = self.criterionGAN(patch_real, True,
                                                for_discriminator=True)
         if self.opt.condition_size:
-            D_losses['D_attr'] = self.opt.lambda_attr * self.criterion_attr(condition_real, condition)
+            D_losses['D_attr'] = torch.mean(
+                self.opt.lambda_attr * self.criterion_attr(condition_real, condition) * self.condition_weight)
 
         return D_losses
 
@@ -192,9 +196,8 @@ class Pix2PixConditionModel(Pix2PixModel):
             return fake_image, condition_fake, condition_real
         else:
             raise ValueError("|mode| is invalid")
-        
+
     def save(self, epoch):
         super(Pix2PixConditionModel, self).save(epoch)
         # additional blender
         util.save_network(self.blender, 'blender', epoch, self.opt)
-        
