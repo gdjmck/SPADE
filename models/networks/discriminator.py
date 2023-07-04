@@ -234,7 +234,7 @@ class NLayerRegressHeadDiscriminator(BaseNetwork):
             ]]
 
         nf_prev = nf
-        nf = min(nf * 2, 512)
+        nf = min(nf * 2, 1024)
         sequence += [[
             nn.Conv2d(nf_prev, nf, kernel_size=self.kw, stride=1, padding=self.padw),
             norm_layer(nf),
