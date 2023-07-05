@@ -61,6 +61,10 @@ class Pix2PixConditionModel(Pix2PixModel):
         fake_concat = torch.cat([input_semantics, fake_image], dim=1)
         real_concat = torch.cat([input_semantics, real_image], dim=1)
 
+        if self.opt.diff_aug:
+            fake_concat = DiffAugment(fake_concat, policy=self.policy)
+            real_concat = DiffAugment(real_concat, policy=self.policy)
+
         # In Batch Normalization, the fake and real images are
         # recommended to be in the same batch to avoid disparate
         # statistics in fake and real images.
@@ -160,10 +164,6 @@ class Pix2PixConditionModel(Pix2PixModel):
             fake_image, _, _ = self.generate_fake(input_semantics, real_image, condition)
             fake_image = fake_image.detach()
             fake_image.requires_grad_()
-
-        if self.opt.diff_aug:
-            fake_image = DiffAugment(fake_image, policy=self.policy)
-            real_image = DiffAugment(real_image, policy=self.policy)
 
         patch_fake, _, patch_real, condition_real = self.discriminate(
             input_semantics, fake_image, real_image)
