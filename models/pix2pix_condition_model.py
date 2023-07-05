@@ -33,7 +33,12 @@ class Pix2PixConditionModel(Pix2PixModel):
         KLD_loss = None
         gram_matrix = None
         # 条件融合
-        z, mu, logvar = self.encode_z(real_image)
+        if real_image is not None:
+            z, mu, logvar = self.encode_z(real_image)
+        else:
+            z = torch.randn(input_semantics.size(0), self.opt.z_dim,
+                            dtype=torch.float32, device=input_semantics.get_device())
+            mu, logvar = None, None
         if condition is not None:
             z = torch.cat([z, condition], 1)
             z = self.blender(z)
@@ -191,7 +196,7 @@ class Pix2PixConditionModel(Pix2PixModel):
             return mu, logvar
         elif mode == 'inference':
             with torch.no_grad():
-                fake_image, _, _ = self.generate_fake(input_semantics, real_image, condition=condition)
+                fake_image, _, _ = self.generate_fake(input_semantics, None, condition=condition)
                 _, condition_fake, _, condition_real = self.discriminate(input_semantics, fake_image, real_image)
             return fake_image, condition_fake, condition_real
         else:

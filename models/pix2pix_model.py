@@ -70,6 +70,8 @@ class Pix2PixModel(torch.nn.Module):
         G_params = list(self.netG.parameters())
         if opt.use_vae:
             G_params += list(self.netE.parameters())
+        if opt.condition_size:
+            G_params += list(self.blender.parameters())
         if opt.isTrain:
             D_params = list(self.netD.parameters())
 
