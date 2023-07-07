@@ -164,7 +164,7 @@ class Pix2PixModel(torch.nn.Module):
                                             for_discriminator=False)
 
         if self.opt.L1_loss:
-            G_losses['L1'] = self.opt.lambda_l1 * self.L1(fake_image, real_image)
+            G_losses['L1'] = self.opt.lambda_l1 * self.L1(fake_image, real_image).mean()
 
         if not self.opt.no_ganFeat_loss:
             num_D = len(pred_fake)
