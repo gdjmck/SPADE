@@ -130,6 +130,11 @@ class Condition:
         return (vr * self.condition_stdvar[-1]) + self.condition_mean[-1]
 
     def get(self, file):
+        """
+        计算图片文件的容积率
+        :param file:
+        :return: 1-D numpy.array
+        """
         if not os.path.exists(file):
             return 0
         elif file in self.condition_dict:

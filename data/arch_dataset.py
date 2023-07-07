@@ -28,6 +28,17 @@ class ArchDataset(CustomDataset):
         if self.opt.condition_size:
             # 添加回归属性
             condition = self.condition_history.get(self.image_paths[index])
+            mask = [1] * 5
+            if self.opt.condition_size < 5:
+                mask[0] = 0
+            if self.opt.condition_size < 4:
+                mask[3] = 0
+            if self.opt.condition_size < 3:
+                mask[1] = 0
+            if self.opt.condition_size < 2:
+                mask[2] = 0
+            condition = condition[np.where(mask)]
+
             result['condition'] = torch.tensor(condition, dtype=torch.float32)
         return result
 

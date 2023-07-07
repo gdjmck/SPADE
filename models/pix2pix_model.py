@@ -108,6 +108,9 @@ class Pix2PixModel(torch.nn.Module):
             if opt.use_vae:
                 netE = util.load_network(netE, 'E', opt.which_epoch, opt)
 
+        if opt.weight_G:  # 专门load generator weights
+            netG.load_state_dict(torch.load(opt.weight_G))
+
         self.netG = netG
         self.netD = netD
         self.netE = netE
