@@ -16,7 +16,7 @@ class Pix2PixConditionModel(Pix2PixModel):
         if opt.isTrain:
             self.criterion_attr = torch.nn.MSELoss(reduction='none')
             self.image_pool = ImagePool(opt.pool_size)
-        if opt.diff_aug:
+        if opt.isTrain and opt.diff_aug:
             self.policy = 'color,translation,cutout'
         if opt.condition_size:
             # 条件顺序：[地块大小, 平均层数, 密度, 楼栋数, 容积率]
@@ -37,7 +37,7 @@ class Pix2PixConditionModel(Pix2PixModel):
         super(Pix2PixConditionModel, self).initialize_networks(opt)
         # blender for code & condition
         self.blender = nn.Linear(256 + opt.condition_size, 256)
-        if not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate):
+        if opt.use_vae and (not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate)):
             self.blender = util.load_network(self.blender, 'blender', opt.which_epoch, opt)
 
     def generate_fake(self, input_semantics, real_image, compute_kld_loss=False, condition=None):
@@ -188,7 +188,7 @@ class Pix2PixConditionModel(Pix2PixModel):
         D_losses['D_real'] = self.criterionGAN(patch_real, True,
                                                for_discriminator=True)
         if self.opt.condition_size:
-            D_losses['D_attr'] = torch.mean(
+            D_losses['D_attr'] = 0.1 * torch.mean(
                 self.opt.lambda_attr * self.criterion_attr(condition_real, condition) * self.condition_weight)
 
         return D_losses
