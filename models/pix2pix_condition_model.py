@@ -100,11 +100,14 @@ class Pix2PixConditionModel(Pix2PixModel):
             real_image_for_vae = self.image_pool.query(real_image)
             fake_image, KLD_loss, gram_matrix = self.generate_fake(
                 input_semantics, real_image_for_vae, self.opt.use_vae, condition)
+        elif self.opt.dont_see_real:
+            fake_image, KLD_loss, gram_matrix = self.generate_fake(
+                input_semantics, None, False, condition)
         else:
             fake_image, KLD_loss, gram_matrix = self.generate_fake(
                 input_semantics, real_image, self.opt.use_vae, condition)
 
-        if self.opt.use_vae:
+        if not self.opt.dont_see_real and self.opt.use_vae:
             G_losses['KLD'] = KLD_loss
 
         if self.opt.diff_aug:

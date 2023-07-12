@@ -68,7 +68,7 @@ class Pix2PixModel(torch.nn.Module):
 
     def create_optimizers(self, opt):
         G_params = list(self.netG.parameters())
-        if opt.use_vae:
+        if opt.use_vae and not opt.dont_see_real:
             G_params += list(self.netE.parameters())
         if opt.condition_size:
             G_params += list(self.blender.parameters())

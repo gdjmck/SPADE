@@ -20,7 +20,6 @@ class TrainOptions(BaseOptions):
 
         # for training
         parser.add_argument('--continue_train', action='store_true', help='continue training: load the latest model')
-        parser.add_argument('--weight_G', type=str, default='', help='checkpoint file for generator')
         parser.add_argument('--which_epoch', type=str, default='latest', help='which epoch to load? set to latest to use latest cached model')
         parser.add_argument('--niter', type=int, default=50, help='# of iter at starting learning rate. This is NOT the total #epochs. Totla #epochs is niter + niter_decay')
         parser.add_argument('--niter_decay', type=int, default=0, help='# of iter to linearly decay learning rate to zero')
@@ -35,6 +34,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--gram_matrix_loss', action='store_true', help='compute MSE loss between gram matrix')
         parser.add_argument('--lambda_gram', type=float, default=100000.0)
         parser.add_argument('--lambda_l1', type=float, default=1.0)
+        parser.add_argument('--dont_see_real', action='store_true', help='generator doesnt see real image')
 
         # the default values for beta1 and beta2 differ by TTUR option
         opt, _ = parser.parse_known_args()

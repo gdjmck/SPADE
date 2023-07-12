@@ -66,6 +66,7 @@ class BaseOptions():
         parser.add_argument('--z_dim', type=int, default=256,
                             help="dimension of the latent z vector")
         parser.add_argument('--classify_color', action='store_true', help='if specified, output would be raw digit as input of softmax layer')
+        parser.add_argument('--weight_G', type=str, default='', help='checkpoint file for generator')
 
         # for instance-wise features
         parser.add_argument('--no_instance', action='store_true', help='if specified, do *not* add instance map as input')

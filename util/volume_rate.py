@@ -8,7 +8,9 @@ import json
 class Condition:
     def __init__(self, opt):
         self.condition_dict = {}
-        self.condition_size = 5
+        self.condition_size = opt.condition_size
+        self.condition_mask = self.get_condition_mask(self.condition_size)
+        self.condition_name = np.array(['fieldSize', 'avgFloors', 'density', 'buildNum', 'volRat'])[self.condition_mask]
         try:
             with open(opt.condition_norm, 'r', encoding='utf-8') as f:
                 condition_norm = json.load(f)
@@ -17,10 +19,25 @@ class Condition:
         except:
             self.condition_mean = np.array([0] * self.condition_size)
             self.condition_stdvar = np.array([1] * self.condition_size)
+        # 过滤不需要的条件
+        self.condition_mean = self.condition_mean[self.condition_mask]
+        self.condition_stdvar = self.condition_stdvar[self.condition_mask]
         self.floor_choice = [1+i*3 for i in range(11)]  # 采样层数 [1, 4, 7, ..., 31]
         self.MAX_AREA = 90000
         self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}  # 层数与颜色的映射
         self.STANDARD_SIZE = 512
+
+    def get_condition_mask(self, condition_size: int):
+        mask = [1] * 5
+        if condition_size < 5:
+            mask[0] = 0
+        if condition_size < 4:
+            mask[3] = 0
+        if condition_size < 3:
+            mask[1] = 0
+        if condition_size < 2:
+            mask[2] = 0
+        return np.where(mask)
 
     def update_mean_and_stdvar(self):
         """
@@ -122,7 +139,7 @@ class Condition:
         density = cover_area / field_area
         floor_avg = float(np.mean(floor_list)) if floor_list else 0
 
-        return [field_area, floor_avg, density, num_builds, volume_rate]
+        return np.array([field_area, floor_avg, density, num_builds, volume_rate])[self.condition_mask].tolist()
 
     def get_volume_rate(self, file):
         condition = self.get(file)
@@ -147,5 +164,5 @@ class Condition:
             self.condition_dict[file] = condition
             return condition
 
-    def read_condition(self, input_list: list):
+    def read_condition(self, input_list):
         return (np.array(input_list) * self.condition_stdvar + self.condition_mean).astype(np.float32)
