@@ -28,15 +28,20 @@ class Condition:
         self.STANDARD_SIZE = 512
 
     def get_condition_mask(self, condition_size: int):
+        """
+        [地块大小, 平均建筑层数, 地块密度, 建筑数量, 容积率]
+        :param condition_size:
+        :return:
+        """
         mask = [1] * 5
         if condition_size < 5:
             mask[0] = 0
         if condition_size < 4:
-            mask[3] = 0
-        if condition_size < 3:
             mask[1] = 0
-        if condition_size < 2:
+        if condition_size < 3:
             mask[2] = 0
+        if condition_size < 2:
+            mask[3] = 0
         return np.where(mask)
 
     def update_mean_and_stdvar(self):
