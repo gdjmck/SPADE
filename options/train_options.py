@@ -51,11 +51,13 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--lambda_color', type=float, default=5.0, help='weight for color loss')
         parser.add_argument('--lambda_TV', type=float, default=10.0, help='weight for color loss')
         parser.add_argument('--lambda_attr', type=float, default=1.0, help='weight for attribute recon loss')
+        parser.add_argument('--lambda_reg', type=float, default=1.0, help='weight for discriminator regularization')
         parser.add_argument('--no_ganFeat_loss', action='store_true', help='if specified, do *not* use discriminator feature matching loss')
         parser.add_argument('--no_vgg_loss', action='store_true', help='if specified, do *not* use VGG feature matching loss')
         parser.add_argument('--gan_mode', type=str, default='hinge', help='(ls|original|hinge)')
         parser.add_argument('--netD', type=str, default='multiscale', help='(n_layers|multiscale|image)')
         parser.add_argument('--lambda_kld', type=float, default=0.05)
         parser.add_argument('--diff_aug', action='store_true', help='to activate differentiable augmentation')
+        parser.add_argument('--regularize_D', action='store_true', help='apply gradient descent on discriminator output to real image')
         self.isTrain = True
         return parser

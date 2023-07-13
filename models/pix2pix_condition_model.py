@@ -3,6 +3,7 @@ import torch.nn as nn
 from .pix2pix_model import Pix2PixModel
 import util.util as util
 import numpy as np
+from torch import nn, autograd, optim
 from util.image_pool import ImagePool
 from util.DiffAugment_pytorch import DiffAugment
 
@@ -94,6 +95,20 @@ class Pix2PixConditionModel(Pix2PixModel):
 
         return patch_fake, condition_fake, patch_real, condition_real
 
+    def d_r1_loss(self, real_pred, real_img):
+        """
+        鉴别器对真实图片的梯度平滑
+        :param real_pred:
+        :param real_img:
+        :return:
+        """
+        grad_real, = autograd.grad(
+            outputs=real_pred.sum(), inputs=real_img, create_graph=True
+        )
+        grad_penalty = grad_real.pow(2).reshape(grad_real.shape[0], -1).sum(1).mean()
+
+        return grad_penalty
+
     def compute_generator_loss(self, input_semantics, real_image, condition=None):
         G_losses = {}
         if self.opt.pool_size > 0:
@@ -181,6 +196,9 @@ class Pix2PixConditionModel(Pix2PixModel):
             fake_image = fake_image.detach()
             fake_image.requires_grad_()
 
+        if self.opt.regularize_D:
+            real_image.requires_grad = True
+
         patch_fake, _, patch_real, condition_real = self.discriminate(
             input_semantics, fake_image, real_image)
 
@@ -193,6 +211,9 @@ class Pix2PixConditionModel(Pix2PixModel):
         if self.opt.condition_size:
             D_losses['D_attr'] = 0.1 * torch.mean(
                 self.opt.lambda_attr * self.criterion_attr(condition_real, condition) * self.condition_weight)
+
+        if self.opt.regularize_D:
+            D_losses['D_regularize'] = self.opt.lambda_reg * self.d_r1_loss(patch_real, real_image)
 
         return D_losses
 
