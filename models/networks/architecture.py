@@ -11,6 +11,19 @@ import torch.nn.utils.spectral_norm as spectral_norm
 from models.networks.normalization import SPADE
 
 
+class ConditionalSPADEResnetBlock(nn.Module):
+    def __init__(self, fin, fout, opt):
+        super(ConditionalSPADEResnetBlock, self).__init__()
+        from models.networks.op.block import StyledConv
+        self.spade_restnet_block = SPADEResnetBlock(fin, fout, opt)
+        self.conditioinal_conv = StyledConv(fout, fout, 3, style_dim=opt.z_dim)
+        
+    def forward(self, x, seg, cond_vec):
+        fused_feat = self.spade_restnet_block(x, seg)
+        fused_feat = self.conditioinal_conv(fused_feat, cond_vec)
+        return fused_feat
+
+
 # ResNet block that uses SPADE.
 # It differs from the ResNet block of pix2pixHD in that
 # it takes in the segmentation map as input, learns the skip connection if necessary,

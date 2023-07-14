@@ -132,6 +132,77 @@ class SPADEGenerator(BaseNetwork):
             return x
 
 
+class SPADEStyleGenerator(SPADEGenerator):
+    def __init__(self, opt):
+        """
+        将SPADEGenerator的SPADEResnetBlock替换为ConditionalSPADEResnetBlock
+        :param opt:
+        """
+        super(SPADEStyleGenerator, self).__init__(opt)
+        from models.networks.architecture import ConditionalSPADEResnetBlock as CSPADEResnetBlock
+        nf = opt.ngf
+        self.head_0 = CSPADEResnetBlock(16 * nf, 16 * nf, opt)
+
+        self.G_middle_0 = CSPADEResnetBlock(16 * nf, 16 * nf, opt)
+        self.G_middle_1 = CSPADEResnetBlock(16 * nf, 16 * nf, opt)
+
+        self.up_0 = CSPADEResnetBlock(16 * nf, 8 * nf, opt)
+        self.up_1 = CSPADEResnetBlock(8 * nf, 4 * nf, opt)
+        self.up_2 = CSPADEResnetBlock(4 * nf, 2 * nf, opt)
+        self.up_3 = CSPADEResnetBlock(2 * nf, 1 * nf, opt)
+
+        if opt.num_upsampling_layers == 'most':
+            self.up_4 = CSPADEResnetBlock(1 * nf, nf // 2, opt)
+
+    def forward(self, input, z, return_gram=False):
+        seg = input
+
+        if self.opt.use_vae:
+            x = self.fc(z)
+            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
+        else:
+            # we downsample segmap and run convolution
+            x = F.interpolate(seg, size=(self.sh, self.sw))
+            x = self.fc(x)
+
+        x = self.head_0(x, seg, z)
+
+        x = self.up(x)
+        x = self.G_middle_0(x, seg, z)
+
+        if self.opt.num_upsampling_layers == 'more' or \
+           self.opt.num_upsampling_layers == 'most':
+            x = self.up(x)
+
+        x = self.G_middle_1(x, seg, z)
+
+        x = self.up(x)
+        x = self.up_0(x, seg, z)
+        x = self.up(x)
+        x = self.up_1(x, seg, z)
+        x = self.up(x)
+        x = self.up_2(x, seg, z)
+        x = self.up(x)
+        x = self.up_3(x, seg, z)
+
+        if self.opt.num_upsampling_layers == 'most':
+            x = self.up(x)
+            x = self.up_4(x, seg, z)
+
+        # gram matrix adds here
+        if return_gram:
+            gram_matrix = self._compute_gram_matrix(x)
+
+        x = self.conv_img(F.leaky_relu(x, 2e-1))
+        if not self.opt.classify_color:
+            x = F.tanh(x)
+
+        if return_gram:
+            return x, gram_matrix
+        else:
+            return x
+
+
 class Pix2PixHDGenerator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
