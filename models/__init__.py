@@ -42,3 +42,15 @@ def create_model(opt):
     print("model [%s] was created" % (type(instance).__name__))
 
     return instance
+
+
+def plot_model(model, input_size):
+    import hiddenlayer as h
+    x = torch.randn(input_size).cuda()
+    graph = h.build_graph(model, x)
+    try:
+        model_name = model.opt.netG
+    except:
+        model_name = 'MODEL'
+    graph.save(path='./graph_{}.png'.format(model_name), format='png')
+    
