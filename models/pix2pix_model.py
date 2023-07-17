@@ -98,7 +98,7 @@ class Pix2PixModel(torch.nn.Module):
 
     def initialize_networks(self, opt):
         netG = networks.define_G(opt)
-        netD = networks.define_D(opt) if opt.isTrain else None
+        netD = networks.define_D(opt) if opt.isTrain or opt.model != 'pix2pix' else None
         netE = networks.define_E(opt) if opt.use_vae else None
 
         if not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate):
