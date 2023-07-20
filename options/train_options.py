@@ -35,6 +35,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--lambda_gram', type=float, default=100000.0)
         parser.add_argument('--lambda_l1', type=float, default=1.0)
         parser.add_argument('--dont_see_real', action='store_true', help='generator doesnt see real image')
+        parser.add_argument('--regressor', type=str, default='', help='checkpoint file for condition regressor')
 
         # the default values for beta1 and beta2 differ by TTUR option
         opt, _ = parser.parse_known_args()

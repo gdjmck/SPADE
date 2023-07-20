@@ -46,7 +46,7 @@ def make_dataset(dir, recursive=False, read_cache=False, write_cache=False):
     if recursive:
         make_dataset_rec(dir, images)
     else:
-        assert os.path.isdir(dir) or os.path.islink(dir), '%s is not a valid directory' % dir
+        assert os.path.isdir(dir) or os.path.islink(dir), '{} is not a valid directory'.format(dir)
 
         for root, dnames, fnames in sorted(os.walk(dir)):
             for fname in fnames:

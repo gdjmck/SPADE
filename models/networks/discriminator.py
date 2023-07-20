@@ -8,6 +8,9 @@ import numpy as np
 import torch.nn.functional as F
 from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
+from models.networks.architecture import ConvLayer, ResBlock, \
+    ConditionalResBlock
+from models.networks.op.block import ModulatedConv2d, EqualLinear
 import torch.nn.utils.spectral_norm as spectral_norm
 import util.util as util
 import functools
@@ -269,6 +272,101 @@ class NLayerRegressHeadDiscriminator(BaseNetwork):
         batchSize = regress_out.size(0)
         regress_out = self.linear(regress_out.view(batchSize, -1))
         return disc_out, regress_out
+
+
+class StyleGANDiscriminator(nn.Module):
+    def __init__(self, size, style_dim, channel_multiplier=2):
+        super().__init__()
+
+        channels = {
+            4: 512,
+            8: 512,
+            16: 512,
+            32: 512,
+            64: 256 * channel_multiplier,
+            128: 128 * channel_multiplier,
+            256: 64 * channel_multiplier,
+            512: 32 * channel_multiplier,
+            1024: 16 * channel_multiplier,
+        }
+
+        # for unconditional conv
+        convs = [ConvLayer(3, channels[size], 1)]  # convs has 1 layer
+
+        log_size = int(math.log(size, 2))
+
+        in_channel = channels[size]
+
+        for i in range(log_size, 2, -1):  # log_size=6: 6,5,4,3 => convs has 5 layers after loop finishes
+            out_channel = channels[2 ** (i - 1)]
+
+            convs.append(ResBlock(in_channel, out_channel))
+
+            in_channel = out_channel
+
+        self.convs = nn.Sequential(*convs)
+
+        # for conditional conv
+        cond_convs = [ModulatedConv2d(3, channels[size], 1, style_dim)]  # convs has 1 layer
+
+        log_size = int(math.log(size, 2))
+
+        in_channel = channels[size]
+
+        for i in range(log_size, 2, -1):  # log_size=6: 6,5,4,3 => convs has 5 layers after loop finishes
+            out_channel = channels[2 ** (i - 1)]
+
+            cond_convs.append(ConditionalResBlock(in_channel, out_channel, style_dim))
+
+            in_channel = out_channel
+
+        self.cond_convs = nn.Sequential(*cond_convs)
+
+        # minibatch stddev
+        self.stddev_group = 4
+        self.stddev_feat = 1
+
+        # final layers
+        self.final_conv = ConvLayer(in_channel + 1, channels[4], 3)
+        self.final_linear = nn.Sequential(
+            EqualLinear(channels[4] * 4 * 4, channels[4], activation='fused_lrelu'),
+            EqualLinear(channels[4], 1),
+        )
+        self.log_size = log_size
+
+    def forward(self, img, label_embedding=None):
+        if label_embedding is None:
+            out = self.convs(img)  # [2,512,4,4]
+        else:
+            out = img
+            if label_embedding.ndim == 3:
+                label_embedding = label_embedding.flip(1)  # [BS, log_size-1, 256]
+            else:
+                label_embedding = label_embedding.unsqueeze(1).repeat(1, self.log_size - 1,
+                                                                      1)  # [BS, log_size-1, embed_dim]
+            i = 0
+            # conditioned at each scale
+            for conv in self.cond_convs:
+                style = label_embedding[:, i]
+                out = conv(out, style)
+                i += 1
+
+        batch, channel, height, width = out.shape
+        group = min(batch, self.stddev_group)
+        stddev = out.view(
+            group, -1, self.stddev_feat, channel // self.stddev_feat, height, width
+        )
+        stddev = torch.sqrt(stddev.var(0, unbiased=False) + 1e-8)
+        stddev = stddev.mean([2, 3, 4], keepdims=True).squeeze(2)
+        stddev = stddev.repeat(group, 1, height, width)
+        out = torch.cat([out, stddev], 1)
+
+        out = self.final_conv(out)
+
+        out = out.view(batch, -1)
+        out = self.final_linear(out)
+
+        return out
 
 
 if __name__ == '__main__':
