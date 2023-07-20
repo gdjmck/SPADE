@@ -13,25 +13,6 @@ from models.networks.normalization import SPADE
 from models.networks.op.block import ModulatedConv2d
 
 
-class ConditionalSPADEResnetBlock(SPADEResnetBlock):
-    def __init__(self, fin, fout, opt):
-        super(ConditionalSPADEResnetBlock, self).__init__(fin, fout, opt)
-        from models.networks.op.block import StyledConv
-        self.pre_activate = nn.LeakyReLU()
-        self.conditioinal_conv = StyledConv(fout, fout, 3, style_dim=opt.z_dim)
-
-    def forward(self, x, seg, cond_vec):
-        x_s = self.shortcut(x, seg)
-
-        dx = self.conv_0(self.actvn(self.norm_0(x, seg)))
-        dx = self.conv_1(self.actvn(self.norm_1(dx, seg)))
-        dx = self.conditioinal_conv(self.pre_activate(dx), cond_vec)
-
-        out = x_s + dx
-
-        return out
-
-
 # ResNet block that uses SPADE.
 # It differs from the ResNet block of pix2pixHD in that
 # it takes in the segmentation map as input, learns the skip connection if necessary,
@@ -87,6 +68,25 @@ class SPADEResnetBlock(nn.Module):
 
     def actvn(self, x):
         return F.leaky_relu(x, 2e-1)
+
+
+class ConditionalSPADEResnetBlock(SPADEResnetBlock):
+    def __init__(self, fin, fout, opt):
+        super(ConditionalSPADEResnetBlock, self).__init__(fin, fout, opt)
+        from models.networks.op.block import StyledConv
+        self.pre_activate = nn.LeakyReLU()
+        self.conditioinal_conv = StyledConv(fout, fout, 3, style_dim=opt.z_dim)
+
+    def forward(self, x, seg, cond_vec):
+        x_s = self.shortcut(x, seg)
+
+        dx = self.conv_0(self.actvn(self.norm_0(x, seg)))
+        dx = self.conv_1(self.actvn(self.norm_1(dx, seg)))
+        dx = self.conditioinal_conv(self.pre_activate(dx), cond_vec)
+
+        out = x_s + dx
+
+        return out
 
 
 # ResNet block used in pix2pixHD
