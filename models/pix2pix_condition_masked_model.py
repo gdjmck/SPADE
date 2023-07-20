@@ -15,7 +15,7 @@ class Pix2PixConditionMaskedModel(Pix2PixConditionModel):
         # create one-hot label map
         label_map = data['label']
         bs, _, h, w = label_map.size()
-        image_masked, mask = random_mask(data['image'])
+        image_masked, mask = random_mask(data['image'], conver_rate=self.opt.cover_rate)
         input_semantics = torch.cat([label_map, mask, image_masked], dim=1)
 
         # concatenate instance map if it exists
