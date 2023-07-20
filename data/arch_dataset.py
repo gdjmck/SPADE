@@ -5,11 +5,42 @@ import torch.nn.functional as F
 from data.custom_dataset import CustomDataset
 from data.image_folder import make_dataset
 from util.volume_rate import Condition
+import random
 
 COLOR_MAP = {i: 200 - i * 20 for i in range(11)}
 
 def open_op(img_mask):
     return cv2.dilate(cv2.erode(img_mask, np.ones((3, 3), dtype=np.uint8), 3), np.ones((3, 3), dtype=np.uint8), 3)
+
+
+def create_random_mask(image_size, mask_size):
+    mask = torch.ones(image_size)
+    h, w = mask_size
+
+    top = random.randint(0, image_size[1] - h)
+    left = random.randint(0, image_size[0] - w)
+
+    mask[top:top+h, left:left+w] = 0
+
+    return mask
+
+
+def random_mask(img: torch.Tensor, conver_rate: float=0.2):
+    """
+    random mask a patch of the image
+    :param img: shape of (*, H, W)
+    :param conver_rate:
+    :return:
+        img_masked
+        mask
+    """
+    h, w = img.size()[-2:]
+    mask = create_random_mask((h, w), (int(h * conver_rate), int(w * conver_rate)))
+    mask = mask.unsqueeze(0).to(img.device)
+    if len(img.size()) == 4:
+        bs = img.size(0)
+        mask = mask.unsqueeze(0).repeat(bs, 1, 1, 1)
+    return img * mask, mask
 
 
 class ArchDataset(CustomDataset):

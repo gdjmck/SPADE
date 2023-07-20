@@ -10,7 +10,6 @@ import torch.nn.functional as F
 import torchvision
 import torch.nn.utils.spectral_norm as spectral_norm
 from models.networks.normalization import SPADE
-from models.networks.op.block import ModulatedConv2d
 
 
 # ResNet block that uses SPADE.
@@ -240,6 +239,7 @@ class ConditionalResBlock(nn.Module):
     def __init__(self, in_channel, out_channel, style_dim):
         super().__init__()
 
+        from models.networks.op.block import ModulatedConv2d
         self.conv1 = ModulatedConv2d(in_channel, in_channel, 3, style_dim)
         self.conv2 = ConvLayer(in_channel, out_channel, 3, downsample=True)
 
