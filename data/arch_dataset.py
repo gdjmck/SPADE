@@ -14,13 +14,13 @@ def open_op(img_mask):
 
 
 def create_random_mask(image_size, mask_size):
-    mask = torch.ones(image_size)
+    mask = torch.zeros(image_size, dtype=torch.bool)
     h, w = mask_size
 
     top = random.randint(0, image_size[1] - h)
     left = random.randint(0, image_size[0] - w)
 
-    mask[top:top+h, left:left+w] = 0
+    mask[top:top+h, left:left+w] = 1
 
     return mask
 
@@ -40,7 +40,9 @@ def random_mask(img: torch.Tensor, conver_rate: float=0.2):
     if len(img.size()) == 4:
         bs = img.size(0)
         mask = mask.unsqueeze(0).repeat(bs, 1, 1, 1)
-    return img * mask, mask
+    img_masked = torch.clone(img)
+    img_masked[mask] = 255
+    return img_masked, mask
 
 
 class ArchDataset(CustomDataset):
