@@ -57,13 +57,16 @@ class ArchDataset(CustomDataset):
         return image
 
     def __getitem__(self, index):
-        result = super(ArchDataset, self).__getitem__(index)
+        data = super(ArchDataset, self).__getitem__(index)
         if self.opt.condition_size:
             # 添加回归属性
             condition = self.condition_history.get(self.image_paths[index])
-
-            result['condition'] = torch.tensor(condition, dtype=torch.float32)
-        return result
+            data['condition'] = torch.tensor(condition, dtype=torch.float32)
+        if self.opt.cover_rate:
+            image_masked, mask = random_mask(data['image'], conver_rate=self.opt.cover_rate)
+            data['mask'] = mask
+            data['image_masked'] = image_masked
+        return data
 
 
     def initialize(self, opt):
