@@ -1,10 +1,14 @@
 import cv2
 import math
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from data.arch_dataset import ArchDataset
 from data.base_dataset import get_params, get_transform, convert_label_image
 from PIL import Image
+
+DEBUG = False
 
 class ArchMaskDataset(ArchDataset):
     """
@@ -19,11 +23,15 @@ class ArchMaskDataset(ArchDataset):
         img = cv2.imread(file)
         if len(img.shape) == 3:
             img = img[..., 0]
-        if img.shape[0] != self.condition_history.STANDARD_SIZE:
-            fx = fy = self.condition_history.STANDARD_SIZE / img.shape[0]
-            img = cv2.resize(img, dsize=None, fx=fx, fy=fy)
+        if DEBUG:
+            plt.imsave('ori_img.png', img)
+        # if img.shape[0] != self.condition_history.STANDARD_SIZE:
+        #     fx = fy = self.condition_history.STANDARD_SIZE / img.shape[0]
+        #     img = cv2.resize(img, dsize=None, fx=fx, fy=fy)
         # 从图片中解析出每个建筑
-        build_info = self.condition_history.parse_image(img)
+        img, build_info = self.condition_history.parse_image(img)
+        if DEBUG:
+            plt.imsave('pro_img.png', img)
         total_building = sum([len(build_list) for build_list in build_info.values()])
         assert total_building > 0
         num_build_to_mask = max(1, math.floor(total_building * cover_rate))
@@ -38,8 +46,12 @@ class ArchMaskDataset(ArchDataset):
         mask_acc = np.zeros_like(img)
         for mask_index in mask_index_list:
             mask_acc = mask_acc + build_mask_list[mask_index]
+        if DEBUG:
+            plt.imsave('mask_out.png', mask_acc)
         # remove image content in mask area
         img[mask_acc > 0] = 255
+        if DEBUG:
+            plt.imsave('masked_img.png', img)
         img = np.repeat(img[..., np.newaxis], 3, axis=-1)
         return Image.fromarray(img)
 

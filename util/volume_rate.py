@@ -1,8 +1,13 @@
 import cv2
 import math
+
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import json
+from shapely.geometry import LineString
+
+DEBUG = False
 
 
 class Condition:
@@ -22,7 +27,7 @@ class Condition:
         # 过滤不需要的条件
         self.condition_mean = self.condition_mean[self.condition_mask]
         self.condition_stdvar = self.condition_stdvar[self.condition_mask]
-        self.floor_choice = [1+i*3 for i in range(11)]  # 采样层数 [1, 4, 7, ..., 31]
+        self.floor_choice = [1 + i * 3 for i in range(11)]  # 采样层数 [1, 4, 7, ..., 31]
         self.MAX_AREA = 90000
         self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}  # 层数与颜色的映射
         self.STANDARD_SIZE = 512
@@ -67,6 +72,10 @@ class Condition:
         return cv2.dilate(cv2.erode(img_mask, np.ones((kernel_size, kernel_size)), 3),
                           np.ones((kernel_size, kernel_size)), 3)
 
+    def mask_dt_distance(self, mask, mask_dt):
+        # 计算mask的点中距离最小值
+        return mask_dt[mask].min()
+
     def parse_image(self, img):
         """
         Return:
@@ -79,14 +88,72 @@ class Condition:
         area_thr = (5 / 300 * img.shape[0]) ** 2  # 对应真实地块中的25㎡
         # 记录每种层高楼栋的轮廓列表
         floor_obj_map = {}
+        # 红线的距离变换矩阵，用于去除地块内部的颜色异常点
+        field_outloop = self.extract_outloop(img)
+        mask_field = np.ones_like(img, dtype=np.uint8)
+        for pt_idx in range(len(field_outloop) - 1):
+            pt_0, pt_1 = field_outloop[pt_idx], field_outloop[pt_idx + 1]
+            cv2.line(mask_field, pt_0, pt_1, 0, lineType=cv2.LINE_AA)
+            mask_field[pt_0[1], pt_0[0]] = 0
+            mask_field[pt_1[1], pt_1[0]] = 0
+        if DEBUG:
+            plt.imsave('field.png', cv2.bitwise_not(mask_field))
+        dtm = cv2.distanceTransform(mask_field * 255, cv2.DIST_L1, cv2.DIST_MASK_PRECISE)
 
+        mask_realloc = np.zeros_like(img)
+        floor_dict = {}
+        floor_dt_dict = {}
         for floor in self.floor_choice:
             floor_obj_map[floor] = []
             # 获取所有层高为floor的楼栋
             mask_floor = self.get_mask(img, floor)
-            mask_floor = self.open_op(mask_floor)
+            mask_floor_clean = self.open_op(mask_floor)
+            if DEBUG:
+                plt.imsave('floor_{}.png'.format(floor), mask_floor_clean)
+            floor_dict[floor] = mask_floor_clean
+            floor_dt_dict[floor] = cv2.distanceTransform((1 - mask_floor_clean) * 255, cv2.DIST_L1,
+                                                         cv2.DIST_MASK_PRECISE)
+            mask_free = (mask_floor_clean == 0) & (mask_floor > 0)  # 被清掉的点
+            # 判断是否为红线（距离红线小于3），不是红线则去除
+            num_clear_comp, mask_clear_comp = cv2.connectedComponents(mask_free.astype(np.uint8), connectivity=4)
+            for i in range(1, num_clear_comp):
+                if self.mask_dt_distance(mask=mask_clear_comp == i, mask_dt=dtm) < 2:  # 到红线最短距离小于2，认为是红线的一部分
+                    mask_free[mask_clear_comp == i] = 0
+            mask_realloc |= mask_free
+
+        # 对偏离的坐标重新赋值
+        num_comp, label_mask_realloc = cv2.connectedComponents(mask_realloc.astype(np.uint8), connectivity=4)
+        for realloc_id in range(1, num_comp):
+            mask = label_mask_realloc == realloc_id
+            # 找距离最近的楼栋进行分配
+            target_floor_type, min_dist = None, np.inf
+            for floor_type in floor_dt_dict.keys():
+                d = self.mask_dt_distance(mask_dt=floor_dt_dict[floor_type], mask=mask)
+                if d < min_dist:
+                    min_dist = d
+                    target_floor_type = floor_type
+
+            if target_floor_type is not None:
+                mask_realloc[mask] = 0
+                floor_dict[target_floor_type][mask] = 1
+
+        # 清空其余非前景区域
+        mask_non_building = np.ones_like(img)
+        # 去除红线区域
+        mask_field_buffer = cv2.dilate(1-mask_field, kernel=np.ones((5, 5)))
+        mask_non_building[mask_field_buffer > 0] = 0
+        # 去除建筑
+        for build_type_mask in floor_dict.values():
+            mask_non_building[build_type_mask > 0] = 0
+        # 清空图片的非前景区域
+        img[mask_non_building > 0] = 255
+        if DEBUG:
+            plt.imsave('p1_mask.png', mask_non_building)
+            plt.imsave('p1.png', img)
+
+        for floor in floor_dict:
             # seperate 每个楼栋
-            components = cv2.connectedComponents(mask_floor)
+            components = cv2.connectedComponents(floor_dict[floor], connectivity=4)
 
             for label in range(1, components[0]):
                 mask_build = (components[1] == label).astype(np.uint8)
@@ -96,7 +163,12 @@ class Condition:
                     if contour[0] != contour[-1]:
                         contour.append(contour[0])
                     floor_obj_map[floor].append(contour)
-        return floor_obj_map
+                else:
+                    # print('建筑面积太小{}被过滤'.format(mask_build.sum()))
+                    mask_build[mask_field_buffer > 0] = 0
+                    img[mask_build > 0] = 255
+
+        return img, floor_obj_map
 
     def extract_outloop(self, img, type_flag='real'):
         if type_flag == 'real':
@@ -125,7 +197,7 @@ class Condition:
         if img.shape[0] != self.STANDARD_SIZE:
             fx = fy = self.STANDARD_SIZE / img.shape[0]
             img = cv2.resize(img, dsize=None, fx=fx, fy=fy)
-        build_info = self.parse_image(img)
+        img, build_info = self.parse_image(img)
         # 根据解析结果计算容积率
         field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2))
         volume_area = 0  # 计容面积
