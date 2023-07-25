@@ -141,7 +141,7 @@ class SPADEStyleGenerator(SPADEGenerator):
         """
         super(SPADEStyleGenerator, self).__init__(opt)
         from models.networks.architecture import ConditionalSPADEResnetBlock as CSPADEResnetBlock
-        self.label_encoder = LabelEncoder(opt, 8 if opt.num_sampling_layers == 'most' else 7)
+        self.label_encoder = LabelEncoder(opt, 8 if opt.num_upsampling_layers == 'most' else 7)
         self.iter_index = 0
         nf = opt.ngf
         self.head_0 = CSPADEResnetBlock(16 * nf, 16 * nf, opt)
