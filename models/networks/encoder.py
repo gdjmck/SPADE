@@ -3,6 +3,7 @@ Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
 
+import math
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
@@ -53,3 +54,29 @@ class ConvEncoder(BaseNetwork):
         logvar = self.fc_var(x)
 
         return mu, logvar
+
+class LabelEncoder(nn.Module):
+    def __init__(self, opt, num_feat: int):
+        """
+        从条件个数作为入参维度，通过3层全连接层，输出ngf维度的特征
+        :param opt:
+        :param num_feat: 输出的特征个数，用于生成器的不同模块位置作为条件注入
+        """
+        self.num_feat = num_feat
+        in_dim = opt.condition_size
+        self.embed_dim = opt.ngf
+        layers = []
+        prev_dim = in_dim
+        next_dim = math.floor(self.embed_dim / 2**3) * num_feat
+        for i in range(2):
+            layers += [nn.Linear(prev_dim, next_dim),
+                       nn.ReLU()]
+            prev_dim = next_dim
+            next_dim = next_dim * 2
+        layers += [nn.Linear(prev_dim, self.embed_dim * num_feat)]
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        feat = self.layers(x)
+        feat = feat.view(-1, self.num_feat, self.embed_dim)
+        return feat
