@@ -62,6 +62,7 @@ class LabelEncoder(nn.Module):
         :param opt:
         :param num_feat: 输出的特征个数，用于生成器的不同模块位置作为条件注入
         """
+        super(LabelEncoder, self).__init__()
         self.num_feat = num_feat
         in_dim = opt.condition_size
         self.embed_dim = opt.ngf
