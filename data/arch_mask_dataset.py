@@ -1,6 +1,6 @@
+import json
 import cv2
 import math
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -29,7 +29,15 @@ class ArchMaskDataset(ArchDataset):
         #     fx = fy = self.condition_history.STANDARD_SIZE / img.shape[0]
         #     img = cv2.resize(img, dsize=None, fx=fx, fy=fy)
         # 从图片中解析出每个建筑
-        img, build_info = self.condition_history.parse_image(img)
+        json_file = file.replace('img', 'parse')[:-3] + 'json'
+        try:
+            with open(json_file, 'r') as f:
+                build_info = json.load(f)
+        except:
+            print('重新识别')
+            img, build_info = self.condition_history.parse_image(img)
+            with open(json_file, 'w') as f:
+                json.dump(build_info, f)
         if DEBUG:
             plt.imsave('pro_img.png', img)
         total_building = sum([len(build_list) for build_list in build_info.values()])

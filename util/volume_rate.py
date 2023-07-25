@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import json
-from shapely.geometry import LineString
 
 DEBUG = False
 
