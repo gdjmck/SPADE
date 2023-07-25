@@ -135,9 +135,11 @@ class Pix2PixModel(torch.nn.Module):
         bs, _, h, w = label_map.size()
         nc = self.opt.label_nc + 1 if self.opt.contain_dontcare_label \
             else self.opt.label_nc
-        input_label = self.FloatTensor(bs, nc, h, w).zero_()
-        input_semantics = input_label.scatter_(1, label_map, 1.0)
-        # input_semantics = label_map.float()
+        try:
+            input_label = self.FloatTensor(bs, nc, h, w).zero_()
+            input_semantics = input_label.scatter_(1, label_map, 1.0)
+        except:
+            input_semantics = label_map.float()
 
         # concatenate instance map if it exists
         if not self.opt.no_instance:
@@ -249,6 +251,20 @@ class Pix2PixModel(torch.nn.Module):
     # for each fake and real image.
 
     def discriminate(self, input_semantics, fake_image, real_image):
+        if self.opt.variance:
+            # 计算variance map作为特征
+            fake_pad = F.pad(fake_image, [1, 1, 1, 1], 'replicate')
+            real_pad = F.pad(real_image, [1, 1, 1, 1], 'replicate')
+            fake_variance = fake_pad[..., 2:, 1: -1] + \
+                            fake_pad[..., :-2, 1: -1] + \
+                            fake_pad[..., 1: -1, 2:] + \
+                            fake_pad[..., 1: -1, :-2] - 4 * fake_image
+            real_variance = real_pad[..., 2:, 1: -1] + \
+                            real_pad[..., :-2, 1: -1] + \
+                            real_pad[..., 1: -1, 2:] + \
+                            real_pad[..., 1: -1, :-2] - 4 * real_image
+            fake_image = torch.cat([fake_image, fake_variance], dim=1)
+            real_image = torch.cat([real_image, real_variance], dim=1)
         fake_concat = torch.cat([input_semantics, fake_image], dim=1)
         real_concat = torch.cat([input_semantics, real_image], dim=1)
 

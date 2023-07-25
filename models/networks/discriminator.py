@@ -111,6 +111,8 @@ class NLayerDiscriminator(BaseNetwork):
             input_nc += 1
         if not opt.no_instance:
             input_nc += 1
+        if opt.variance:  # attach variance map
+            input_nc += opt.input_nc
         return input_nc
 
     def forward(self, input):

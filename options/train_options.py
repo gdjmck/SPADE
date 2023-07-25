@@ -61,5 +61,6 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--lambda_kld', type=float, default=0.05)
         parser.add_argument('--diff_aug', action='store_true', help='to activate differentiable augmentation')
         parser.add_argument('--regularize_D', action='store_true', help='apply gradient descent on discriminator output to real image')
+        parser.add_argument('--variance', action='store_true', help='attach variance map of the image to discriminator input')
         self.isTrain = True
         return parser
