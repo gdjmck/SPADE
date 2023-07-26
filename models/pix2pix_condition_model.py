@@ -50,7 +50,7 @@ class Pix2PixConditionModel(Pix2PixModel):
             z, mu, logvar = self.encode_z(real_image)
         else:
             z = torch.randn(input_semantics.size(0), self.opt.z_dim,
-                            dtype=torch.float32, device=input_semantics.get_device())
+                            dtype=torch.float32, device=input_semantics.device)
             mu, logvar = None, None
         if condition is not None:
             z = torch.cat([z, condition], 1)
@@ -191,7 +191,7 @@ class Pix2PixConditionModel(Pix2PixModel):
     def compute_discriminator_loss(self, input_semantics, real_image, condition):
         D_losses = {}
         with torch.no_grad():
-            fake_image, _, _ = self.generate_fake(input_semantics, real_image, condition)
+            fake_image, _, _ = self.generate_fake(input_semantics, real_image, condition=condition)
             fake_image = fake_image.detach()
             fake_image.requires_grad_()
 
