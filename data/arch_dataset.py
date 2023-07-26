@@ -41,7 +41,8 @@ def random_mask(img: torch.Tensor, conver_rate: float=0.2):
         bs = img.size(0)
         mask = mask.unsqueeze(0).repeat(bs, 1, 1, 1)
     img_masked = torch.clone(img)
-    img_masked[mask] = 255
+    mask_val = img_masked.max()
+    img_masked[mask] = mask_val
     return img_masked, mask
 
 

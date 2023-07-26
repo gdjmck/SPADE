@@ -63,9 +63,7 @@ class Pix2pixDataset(BaseDataset):
         label = Image.fromarray(convert_label_image(np.array(label)))
         params = get_params(self.opt, label.size)
         transform_label = get_transform(self.opt, params, method=Image.NEAREST, normalize=False)
-        label_tensor = transform_label(label) * 255.0
-        # label像素值为255的未知类别
-        label_tensor[label_tensor == 255] = self.opt.label_nc  # 'unknown' is opt.label_nc
+        label_tensor = transform_label(label)
 
         # input image (real images)
         image_path = self.image_paths[index]
