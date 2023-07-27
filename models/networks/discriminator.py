@@ -10,7 +10,6 @@ from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
 from models.networks.architecture import ConvLayer, ResBlock, \
     ConditionalResBlock
-from models.networks.op.block import ModulatedConv2d, EqualLinear
 import torch.nn.utils.spectral_norm as spectral_norm
 import util.util as util
 import functools
@@ -279,6 +278,7 @@ class NLayerRegressHeadDiscriminator(BaseNetwork):
 class StyleGANDiscriminator(nn.Module):
     def __init__(self, size, style_dim, channel_multiplier=2):
         super().__init__()
+        from models.networks.op.block import ModulatedConv2d, EqualLinear
 
         channels = {
             4: 512,
