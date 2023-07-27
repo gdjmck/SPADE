@@ -67,7 +67,8 @@ for i, data_i in enumerate(dataloader):
             data_i['condition'] = torch.Tensor([pre_condition.get(
                 r'd:\Documents\aisr\GeosRelate\dataset_style3_slim\ArrangeMode\ColumnRow\arch_GZ\27.jpg').tolist()]).to(
                 data_i['label'].device)
-        generated, condition_fake, condition_real = model(data_i, mode='inference')
+        generated, condition_fake, condition_real, semantics = model(data_i, mode='inference')
+        data_i['image_masked'] = semantics[:, 2:]
     else:
         generated = model(data_i, mode='inference')
 

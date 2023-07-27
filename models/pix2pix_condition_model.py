@@ -234,7 +234,7 @@ class Pix2PixConditionModel(Pix2PixModel):
             with torch.no_grad():
                 fake_image, _, _ = self.generate_fake(input_semantics, None, condition=condition)
                 _, condition_fake, _, condition_real = self.discriminate(input_semantics, fake_image, real_image)
-            return fake_image, condition_fake, condition_real
+            return fake_image, condition_fake, condition_real, input_semantics
         else:
             raise ValueError("|mode| is invalid")
 
