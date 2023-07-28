@@ -40,7 +40,7 @@ class Pix2PixConditionModel(Pix2PixModel):
                                        nn.Linear(256, 256), nn.ReLU(), nn.Linear(256, 256))
         self.blender = nn.Sequential(nn.Linear(512, 256),
                                      nn.InstanceNorm1d(256))
-        if opt.gpu_ids != -1:
+        if self.use_gpu():
             self.projector.cuda()
             self.blender.cuda()
         if opt.use_vae and (not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate)):
