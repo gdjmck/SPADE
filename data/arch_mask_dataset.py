@@ -1,4 +1,6 @@
 import json
+import random
+
 import cv2
 import math
 import matplotlib.pyplot as plt
@@ -42,7 +44,7 @@ class ArchMaskDataset(ArchDataset):
             plt.imsave('pro_img.png', img)
         total_building = sum([len(build_list) for build_list in build_info.values()])
         assert total_building > 0
-        num_build_to_mask = max(1, math.floor(total_building * cover_rate))
+        num_build_to_mask = random.randint(0, math.floor(total_building * cover_rate))
 
         build_mask_list = []
         for floor, outloop_list in build_info.items():
