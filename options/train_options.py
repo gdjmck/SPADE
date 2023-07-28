@@ -37,6 +37,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--dont_see_real', action='store_true', help='generator doesnt see real image')
         parser.add_argument('--regressor', type=str, default='', help='checkpoint file for condition regressor')
         parser.add_argument('--cover_rate', type=float, default=0, help='percentage of the image to be covered training masked GauGAN')
+        parser.add_argument('--lr_discount', type=float, default=0.01, help='learning rate discount factor for condition encoder')
 
         # the default values for beta1 and beta2 differ by TTUR option
         opt, _ = parser.parse_known_args()

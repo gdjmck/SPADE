@@ -1,6 +1,5 @@
 import torch
 from models.pix2pix_condition_model import Pix2PixConditionModel
-from data.arch_dataset import random_mask
 
 
 class Pix2PixConditionMaskedModel(Pix2PixConditionModel):

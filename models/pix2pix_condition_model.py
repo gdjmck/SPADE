@@ -36,9 +36,34 @@ class Pix2PixConditionModel(Pix2PixModel):
     def initialize_networks(self, opt):
         super(Pix2PixConditionModel, self).initialize_networks(opt)
         # blender for code & condition
-        self.blender = nn.Linear(256 + opt.condition_size, 256)
+        self.projector = nn.Sequential(nn.Linear(opt.condition_size, 256), nn.ReLU(),
+                                       nn.Linear(256, 256), nn.ReLU(), nn.Linear(256, 256))
+        self.blender = nn.Sequential(nn.Linear(512, 256),
+                                     nn.InstanceNorm1d(256))
         if opt.use_vae and (not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate)):
             self.blender = util.load_network(self.blender, 'blender', opt.which_epoch, opt)
+            self.projector = util.load_network(self.projector, 'projector', opt.which_epoch, opt)
+
+    def create_optimizers(self, opt):
+        G_params = list(self.netG.parameters())
+        if opt.use_vae and not opt.dont_see_real:
+            G_params += list(self.netE.parameters())
+        if opt.condition_size:
+            G_params += [{'params': self.blender.parameters(), 'lr': opt.lr_discount * opt.lr},
+                         {'params': self.projector.parameters(), 'lr': opt.lr_discount * opt.lr}]
+        if opt.isTrain:
+            D_params = list(self.netD.parameters())
+
+        beta1, beta2 = opt.beta1, opt.beta2
+        if opt.no_TTUR:
+            G_lr, D_lr = opt.lr, opt.lr
+        else:
+            G_lr, D_lr = opt.lr / 2, opt.lr * 2
+
+        optimizer_G = torch.optim.Adam(G_params, lr=G_lr, betas=(beta1, beta2))
+        optimizer_D = torch.optim.Adam(D_params, lr=D_lr, betas=(beta1, beta2))
+
+        return optimizer_G, optimizer_D
 
     def generate_fake(self, input_semantics, real_image, compute_kld_loss=False, condition=None):
         assert self.opt.use_vae
@@ -53,6 +78,7 @@ class Pix2PixConditionModel(Pix2PixModel):
                             dtype=torch.float32, device=input_semantics.device)
             mu, logvar = None, None
         if condition is not None:
+            condition = self.projector(condition)
             z = torch.cat([z, condition], 1)
             z = self.blender(z)
             if compute_kld_loss:
@@ -242,6 +268,3 @@ class Pix2PixConditionModel(Pix2PixModel):
         super(Pix2PixConditionModel, self).save(epoch)
         # additional blender
         util.save_network(self.blender, 'blender', epoch, self.opt)
-
-
-
