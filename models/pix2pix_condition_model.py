@@ -40,6 +40,9 @@ class Pix2PixConditionModel(Pix2PixModel):
                                        nn.Linear(256, 256), nn.ReLU(), nn.Linear(256, 256))
         self.blender = nn.Sequential(nn.Linear(512, 256),
                                      nn.InstanceNorm1d(256))
+        if opt.gpu_ids != -1:
+            self.projector.cuda()
+            self.blender.cuda()
         if opt.use_vae and (not opt.isTrain or opt.continue_train or (hasattr(opt, 'isValidate') and opt.isValidate)):
             self.blender = util.load_network(self.blender, 'blender', opt.which_epoch, opt)
             self.projector = util.load_network(self.projector, 'projector', opt.which_epoch, opt)
@@ -49,8 +52,9 @@ class Pix2PixConditionModel(Pix2PixModel):
         if opt.use_vae and not opt.dont_see_real:
             G_params += list(self.netE.parameters())
         if opt.condition_size:
-            G_params += [{'params': self.blender.parameters(), 'lr': opt.lr_discount * opt.lr},
-                         {'params': self.projector.parameters(), 'lr': opt.lr_discount * opt.lr}]
+            G_params = [{'params': self.blender.parameters(), 'lr': opt.lr_discount * opt.lr},
+                        {'params': self.projector.parameters(), 'lr': opt.lr_discount * opt.lr}] +\
+                       [{'params': params} for params in G_params]
         if opt.isTrain:
             D_params = list(self.netD.parameters())
 
