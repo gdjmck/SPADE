@@ -212,6 +212,15 @@ def load_network(net, label, epoch, opt):
     return net
 
 
+def print_network(net):
+    num_params = 0
+    for param in net.parameters():
+        num_params += param.numel()
+    print('Network [%s] was created. Total number of parameters: %.1f million. '
+          'To see the architecture, do print(network).'
+          % (type(net).__name__, num_params / 1000000))
+
+
 ###############################################################################
 # Code from
 # https://github.com/ycszen/pytorch-seg/blob/master/transform.py

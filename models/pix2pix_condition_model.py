@@ -40,6 +40,8 @@ class Pix2PixConditionModel(Pix2PixModel):
                                        nn.Linear(256, 256), nn.ReLU(), nn.Linear(256, 256))
         self.blender = nn.Sequential(nn.Linear(512, 256),
                                      nn.InstanceNorm1d(256))
+        util.print_network(self.projector)
+        util.print_network(self.blender)
         if self.use_gpu():
             self.projector.cuda()
             self.blender.cuda()
