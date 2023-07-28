@@ -1,3 +1,5 @@
+import traceback
+
 import cv2
 import math
 
@@ -10,11 +12,17 @@ DEBUG = False
 
 
 class Condition:
+    condition_dict = {'s': 'fieldSize', 'v': 'volRat', 'n': 'buildNum', 'f': 'avgFloors', 'd': 'density'}
+
     def __init__(self, opt):
+        self.opt = opt
         self.condition_dict = {}
         self.condition_size = opt.condition_size
-        self.condition_mask = self.get_condition_mask(self.condition_size)
-        self.condition_name = np.array(['fieldSize', 'avgFloors', 'density', 'buildNum', 'volRat'])[self.condition_mask]
+        # 所有条件label必须在condition_dict中
+        assert all([c in Condition.condition_dict for c in list(opt.condition_order)])
+        self.condition_name = np.array([Condition.condition_dict[c] for c in list(opt.condition_order)])
+        self.condition_mask = np.ones(len(Condition.condition_dict)).astype(bool)
+        self.condition_mask[self.condition_size:] = False
         try:
             with open(opt.condition_norm, 'r', encoding='utf-8') as f:
                 condition_norm = json.load(f)
@@ -23,6 +31,24 @@ class Condition:
         except:
             self.condition_mean = np.array([0] * self.condition_size)
             self.condition_stdvar = np.array([1] * self.condition_size)
+        # 条件的均值标准差按condition_order进行重新排序
+        self.reorder_index_list = self.condition_order_mask()
+        self.condition_mean = self.reorder(self.condition_mean)
+        self.condition_stdvar = self.reorder(self.condition_stdvar)
+
+        # 原始json数据计算条件
+        try:
+            if os.path.exists(opt.condition_json):
+                with open(opt.condition_json, 'r') as f:
+                    condition_json = json.load(f)
+                # 将列表转换为_id为key的字典
+                self.condition_json = {}  # id: [boundary, buildings]
+                for item in condition_json:
+                    self.condition_json[item['_id']] = {key: item[key] for key in ['boundary', 'buildings']}
+        except:
+            print(traceback.format_exc())
+            self.condition_json = None
+
         # 过滤不需要的条件
         self.condition_mean = self.condition_mean[self.condition_mask]
         self.condition_stdvar = self.condition_stdvar[self.condition_mask]
@@ -31,22 +57,17 @@ class Condition:
         self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}  # 层数与颜色的映射
         self.STANDARD_SIZE = 512
 
-    def get_condition_mask(self, condition_size: int):
+    def reorder(self, condition: np.array):
+        return condition[self.reorder_index_list]
+
+    def condition_order_mask(self):
         """
         [地块大小, 平均建筑层数, 地块密度, 建筑数量, 容积率]
         :param condition_size:
-        :return:
+        :return: opt.condition_order对默认条件顺序的索引
         """
-        mask = [1] * 5
-        if condition_size < 5:
-            mask[0] = 0
-        if condition_size < 4:
-            mask[1] = 0
-        if condition_size < 3:
-            mask[2] = 0
-        if condition_size < 2:
-            mask[3] = 0
-        return np.where(mask)
+        default_order = list('sfdnv')
+        return [default_order.index(c) for c in list(self.opt.condition_order)]
 
     def update_mean_and_stdvar(self):
         """
@@ -63,6 +84,12 @@ class Condition:
         # print('更新的均值为:{}\n标准差为:{}'.format(mean_update, var_update))
 
     def get_mask(self, mask_all, floor: int):
+        """
+        按层数获取相应的掩码
+        :param mask_all:
+        :param floor:
+        :return:
+        """
         segment = math.floor(floor / 3)
         color_range = (self.COLOR_MAP[segment] - 10, self.COLOR_MAP[segment] + 10)
         return ((color_range[0] <= mask_all) & (mask_all < color_range[1])).astype(np.uint8)
@@ -186,9 +213,38 @@ class Condition:
             contour.append(contour[0])
         return contour
 
+    def read_condition_from_json(self, file):
+        split_char = '/' if '/' in file else '\\'
+        fid = file.rsplit(split_char, 1)[-1].rsplit('.', 1)[0]
+        if self.condition_json and fid in self.condition_json:
+            raw_data = self.condition_json[fid]
+            field_size = cv2.contourArea(np.array(raw_data['boundary'], dtype=np.float32))
+            condition_values = []
+            for c in self.opt.condition_order[:self.opt.condition_size]:
+                if c == 's':  # 地块大小
+                    condition_values.append(field_size)
+                elif c == 'f':  # 平均层数
+                    avg_floor = np.array([build['floor'] for build in raw_data['buildings']]).mean()
+                    condition_values.append(avg_floor)
+                elif c == 'd':  # 密度
+                    cover_area = sum([cv2.contourArea(np.array(build['coords'], dtype=np.float32)) for build in raw_data['buildings']]) \
+                                 / field_size
+                    condition_values.append(cover_area)
+                elif c == 'n':  # 建筑数量
+                    num_builds = len(raw_data['buildings'])
+                    condition_values.append(num_builds)
+                elif c == 'v':  # 容积率
+                    volume_ratio = sum([cv2.contourArea(np.array(build['coords'], dtype=np.float32)) * build['floor']
+                                        for build in raw_data['buildings']]) / field_size
+                    condition_values.append(volume_ratio)
+            return condition_values
+        else:
+            return False
+
+
     def cal_condition(self, file, real_flag=True):
         """
-        计算 [地块大小, 平均建筑层数, 地块密度, 建筑数量, 容积率]
+        计算原始条件 [地块大小, 平均建筑层数, 地块密度, 建筑数量, 容积率]
         """
         img = cv2.imread(file)
         if len(img.shape) == 3:
@@ -215,7 +271,11 @@ class Condition:
         density = cover_area / field_area
         floor_avg = float(np.mean(floor_list)) if floor_list else 0
 
-        return np.array([field_area, floor_avg, density, num_builds, volume_rate])[self.condition_mask].tolist()
+        condition_array = np.array([field_area, floor_avg, density, num_builds, volume_rate])
+        condition_array = self.reorder(condition_array)
+
+        return condition_array[self.condition_mask].tolist()
+
 
     def get_volume_rate(self, file):
         condition = self.get(file)
@@ -234,7 +294,10 @@ class Condition:
             return self.condition_dict[file]
         else:
             # 生成并记录
-            condition = self.cal_condition(file)
+            if self.condition_json:  # 从json中读取
+                condition = self.read_condition_from_json(file)
+            if not condition:  # 从图片中读取
+                condition = self.cal_condition(file)
             # z-score
             condition = (np.array(condition) - self.condition_mean) / self.condition_stdvar
             self.condition_dict[file] = condition
@@ -242,3 +305,11 @@ class Condition:
 
     def read_condition(self, input_list):
         return (np.array(input_list) * self.condition_stdvar + self.condition_mean).astype(np.float32)
+
+if __name__ == '__main__':
+    # 统计数据集的条件均值与方差
+    from options.train_options import TrainOptions
+    # parse options
+    opt = TrainOptions().parse()
+    condition_logger = Condition(opt)
+    condition_logger.condition_json

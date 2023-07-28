@@ -29,3 +29,24 @@ class Pix2PixNumMaskModel(Pix2PixConditionModel):
             condition = condition.to(input_semantics.device)
 
         return input_semantics, data['image'], condition
+
+    def forward(self, data, mode):
+        input_semantics, real_image, condition = self.preprocess_input(data)  # vr = None if not opt.volume_rate
+
+        if mode == 'generator':
+            g_loss, generated = self.compute_generator_loss(
+                input_semantics, real_image, condition)
+            return g_loss, generated
+        elif mode == 'discriminator':
+            d_loss = self.compute_discriminator_loss(
+                input_semantics, real_image, condition)
+            return d_loss
+        elif mode == 'encode_only':
+            z, mu, logvar = self.encode_z(real_image)
+            return mu, logvar
+        elif mode == 'inference':
+            with torch.no_grad():
+                fake_image, _, _ = self.generate_fake(input_semantics, None, condition=condition)
+            return fake_image
+        else:
+            raise ValueError("|mode| is invalid")

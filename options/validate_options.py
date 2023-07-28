@@ -11,7 +11,7 @@ class ValidateOptions(TrainOptions):
         parser.set_defaults(serial_batches=True)
         parser.set_defaults(no_flip=True)
         parser.set_defaults(phase='test')
-        self.isTrain = True
+        self.isTrain = False
         self.initialized = True
         self.isValidate = True
         return parser
