@@ -37,6 +37,7 @@ class Condition:
         self.condition_stdvar = self.reorder(self.condition_stdvar)
 
         # 原始json数据计算条件
+        self.condition_json = None
         try:
             if os.path.exists(opt.condition_json):
                 with open(opt.condition_json, 'r') as f:
@@ -47,7 +48,6 @@ class Condition:
                     self.condition_json[item['_id']] = {key: item[key] for key in ['boundary', 'buildings']}
         except:
             print(traceback.format_exc())
-            self.condition_json = None
 
         # 过滤不需要的条件
         self.condition_mean = self.condition_mean[self.condition_mask]
@@ -294,6 +294,7 @@ class Condition:
             return self.condition_dict[file]
         else:
             # 生成并记录
+            condition = None
             if self.condition_json:  # 从json中读取
                 condition = self.read_condition_from_json(file)
             if not condition:  # 从图片中读取
