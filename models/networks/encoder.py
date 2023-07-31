@@ -65,7 +65,7 @@ class LabelEncoder(nn.Module):
         super(LabelEncoder, self).__init__()
         self.num_feat = num_feat
         in_dim = opt.condition_size
-        self.embed_dim = opt.ngf
+        self.embed_dim = opt.ngf * 4
         layers = []
         prev_dim = in_dim
         next_dim = math.floor(self.embed_dim / 2**3) * num_feat
