@@ -12,6 +12,8 @@ class Pix2PixConditionMaskedModel(Pix2PixConditionModel):
             data['label'] = data['label'].cuda()
             data['instance'] = data['instance'].cuda()
             data['image'] = data['image'].cuda()
+            data['mask'] = data['mask'].cuda()
+            data['image_masked'] = data['image_masked'].cuda()
 
         # create one-hot label map
         label_map = data['label']

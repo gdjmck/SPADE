@@ -91,6 +91,8 @@ for i, data_i in enumerate(dataloader):
             print('真实的条件:{}\n预测真实图片的条件:{}\n预测生成图片的条件:{}\n生成图片的真实条件:{}'.format(
                 condition_read, condition_real, condition_fake, condition_of_fake))
             for tag, index in zip(pre_condition.condition_name, range(len(pre_condition.condition_name))):
+                if index >= opt.condition_size:
+                    break
                 summary_writer.add_scalars(main_tag='Condition.{}'.format(tag),
                                            tag_scalar_dict={'real_read': condition_read[0][index],
                                                             'real_pred': condition_real[0][index],
