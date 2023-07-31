@@ -41,6 +41,7 @@ class BaseOptions():
         parser.add_argument('--output_nc', type=int, default=3, help='# of output image channels')
         parser.add_argument('--input_nc', type=int, default=3, help='# of input image channel, if necessary')
         parser.add_argument('--condition_size', type=int, default=5, help='# of condition')
+        parser.add_argument('--condition_order', type=str, default='sfdnv', help='default order is volume, number of building, density, average floor and field size')
         parser.add_argument('--condition_norm', type=str, default='./config/mean&stdvar.json', help='json file that contains default mean and stdvar value of condition vector')
         parser.add_argument('--volume_rate', action='store_true',
                             help='volume rate of input image as a condition to insert into generator network')
@@ -55,6 +56,7 @@ class BaseOptions():
         parser.add_argument('--load_from_opt_file', action='store_true', help='load the options from checkpoints and use that as default')
         parser.add_argument('--cache_filelist_write', action='store_true', help='saves the current filelist into a text file, so that it loads faster')
         parser.add_argument('--cache_filelist_read', action='store_true', help='reads from the file list cache')
+        parser.add_argument('--condition_json', type=str, default='', help='condition json file')
 
         # for displays
         parser.add_argument('--display_winsize', type=int, default=400, help='display window size')

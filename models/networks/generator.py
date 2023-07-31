@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import functools
 import math
+from models.networks.encoder import LabelEncoder
 from models.networks.base_network import BaseNetwork
 from models.networks.normalization import get_nonspade_norm_layer
 from models.networks.architecture import ResnetBlock as ResnetBlock
@@ -140,6 +141,8 @@ class SPADEStyleGenerator(SPADEGenerator):
         """
         super(SPADEStyleGenerator, self).__init__(opt)
         from models.networks.architecture import ConditionalSPADEResnetBlock as CSPADEResnetBlock
+        self.label_encoder = LabelEncoder(opt, 8 if opt.num_upsampling_layers == 'most' else 7)
+        self.iter_index = 0
         nf = opt.ngf
         self.head_0 = CSPADEResnetBlock(16 * nf, 16 * nf, opt)
 
@@ -154,40 +157,51 @@ class SPADEStyleGenerator(SPADEGenerator):
         if opt.num_upsampling_layers == 'most':
             self.up_4 = CSPADEResnetBlock(1 * nf, nf // 2, opt)
 
+    def iter(self, feat):
+        self.iter_index += 1
+        return feat[:, self.iter_index-1]
+
     def forward(self, input, z, return_gram=False):
+        """
+
+        :param input: semantic map
+        :param z: condition tensor
+        :param return_gram:
+        :return:
+        """
         seg = input
+        self.iter_index = 0
 
-        if self.opt.use_vae:
-            x = self.fc(z)
-            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
-        else:
-            # we downsample segmap and run convolution
-            x = F.interpolate(seg, size=(self.sh, self.sw))
-            x = self.fc(x)
+        z = self.label_encoder(z)
 
-        x = self.head_0(x, seg, z)
+        noise = torch.randn(input.size(0), self.opt.z_dim,
+                            dtype=torch.float32, device=input.get_device())
+        x = self.fc(noise)
+        x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
+
+        x = self.head_0(x, seg, self.iter(z))
 
         x = self.up(x)
-        x = self.G_middle_0(x, seg, z)
+        x = self.G_middle_0(x, seg, self.iter(z))
 
         if self.opt.num_upsampling_layers == 'more' or \
            self.opt.num_upsampling_layers == 'most':
             x = self.up(x)
 
-        x = self.G_middle_1(x, seg, z)
+        x = self.G_middle_1(x, seg, self.iter(z))
 
         x = self.up(x)
-        x = self.up_0(x, seg, z)
+        x = self.up_0(x, seg, self.iter(z))
         x = self.up(x)
-        x = self.up_1(x, seg, z)
+        x = self.up_1(x, seg, self.iter(z))
         x = self.up(x)
-        x = self.up_2(x, seg, z)
+        x = self.up_2(x, seg, self.iter(z))
         x = self.up(x)
-        x = self.up_3(x, seg, z)
+        x = self.up_3(x, seg, self.iter(z))
 
         if self.opt.num_upsampling_layers == 'most':
             x = self.up(x)
-            x = self.up_4(x, seg, z)
+            x = self.up_4(x, seg, self.iter(z))
 
         # gram matrix adds here
         if return_gram:

@@ -14,13 +14,13 @@ def open_op(img_mask):
 
 
 def create_random_mask(image_size, mask_size):
-    mask = torch.ones(image_size)
+    mask = torch.zeros(image_size, dtype=torch.bool)
     h, w = mask_size
 
     top = random.randint(0, image_size[1] - h)
     left = random.randint(0, image_size[0] - w)
 
-    mask[top:top+h, left:left+w] = 0
+    mask[top:top+h, left:left+w] = 1
 
     return mask
 
@@ -40,7 +40,10 @@ def random_mask(img: torch.Tensor, conver_rate: float=0.2):
     if len(img.size()) == 4:
         bs = img.size(0)
         mask = mask.unsqueeze(0).repeat(bs, 1, 1, 1)
-    return img * mask, mask
+    img_masked = torch.clone(img)
+    mask_val = img_masked.max()
+    img_masked[mask] = mask_val
+    return img_masked, mask
 
 
 class ArchDataset(CustomDataset):
@@ -55,13 +58,16 @@ class ArchDataset(CustomDataset):
         return image
 
     def __getitem__(self, index):
-        result = super(ArchDataset, self).__getitem__(index)
+        data = super(ArchDataset, self).__getitem__(index)
         if self.opt.condition_size:
             # 添加回归属性
             condition = self.condition_history.get(self.image_paths[index])
-
-            result['condition'] = torch.tensor(condition, dtype=torch.float32)
-        return result
+            data['condition'] = torch.tensor(condition, dtype=torch.float32)
+        if self.opt.cover_rate:
+            image_masked, mask = random_mask(data['image'], conver_rate=self.opt.cover_rate)
+            data['mask'] = mask
+            data['image_masked'] = image_masked
+        return data
 
 
     def initialize(self, opt):

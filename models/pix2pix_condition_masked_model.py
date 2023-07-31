@@ -2,6 +2,7 @@ import torch
 from models.pix2pix_condition_model import Pix2PixConditionModel
 from data.arch_dataset import random_mask
 
+
 class Pix2PixConditionMaskedModel(Pix2PixConditionModel):
     def preprocess_input(self, data):
         # move to GPU and change data types
@@ -15,8 +16,7 @@ class Pix2PixConditionMaskedModel(Pix2PixConditionModel):
         # create one-hot label map
         label_map = data['label']
         bs, _, h, w = label_map.size()
-        image_masked, mask = random_mask(data['image'], conver_rate=self.opt.cover_rate)
-        input_semantics = torch.cat([label_map, mask, image_masked], dim=1)
+        input_semantics = torch.cat([label_map, data['mask'], data['image_masked']], dim=1)
 
         # concatenate instance map if it exists
         if not self.opt.no_instance:
