@@ -68,6 +68,8 @@ class Pix2PixConditionModel(Pix2PixModel):
         condition = data.get('condition', None)
         if condition is not None:
             condition = condition.to(data_processed[0].device)
+            if self.opt.condition_probe:
+                data['condition_probe'] = data['condition_probe'].cuda()
         return list(data_processed[:-1]) + [condition]
 
     def discriminate(self, input_semantics, fake_image, real_image):
@@ -108,7 +110,7 @@ class Pix2PixConditionModel(Pix2PixModel):
 
         return grad_penalty
 
-    def compute_generator_loss(self, input_semantics, real_image, condition=None):
+    def compute_generator_loss(self, input_semantics, real_image, condition=None, condition_probe=None):
         G_losses = {}
         if self.opt.pool_size > 0:
             real_image_for_vae = self.image_pool.query(real_image)
@@ -120,6 +122,14 @@ class Pix2PixConditionModel(Pix2PixModel):
         else:
             fake_image, KLD_loss, gram_matrix = self.generate_fake(
                 input_semantics, real_image, self.opt.use_vae, condition)
+
+        # condition probing
+        if self.opt.condition_probe and self.opt.condition_size:
+            fake_image_probe, _, _ = self.generate_fake(input_semantics, None, condition_probe)
+            patch_probe_fake, condition_probe_fake, _, _ = self.discriminate(input_semantics, fake_image_probe, real_image)
+            G_losses['GAN_probe'] = self.criterionGAN(patch_probe_fake, True, for_discriminator=True)
+            G_losses['G_attr_probe'] = torch.mean(self.opt.lambda_attr * self.condition_weight *
+                                                  self.criterion_attr(condition_probe_fake, condition_probe))
 
         if not self.opt.dont_see_real and self.opt.use_vae:
             G_losses['KLD'] = KLD_loss
@@ -221,7 +231,7 @@ class Pix2PixConditionModel(Pix2PixModel):
 
         if mode == 'generator':
             g_loss, generated = self.compute_generator_loss(
-                input_semantics, real_image, condition)
+                input_semantics, real_image, condition, data.get('condition_probe', None))
             return g_loss, generated
         elif mode == 'discriminator':
             d_loss = self.compute_discriminator_loss(

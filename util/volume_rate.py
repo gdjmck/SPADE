@@ -1,8 +1,7 @@
+import random
 import traceback
-
 import cv2
 import math
-
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -10,6 +9,10 @@ import json
 
 DEBUG = False
 
+def probe(val, stdvar, max_range: float=0.1):
+    seed = random.randint(1, 10) / 10
+    sign = random.randint(0, 1) == 1
+    return val + sign * seed * max_range / stdvar
 
 class Condition:
     condition_dict = {'s': 'fieldSize', 'v': 'volRat', 'n': 'buildNum', 'f': 'avgFloors', 'd': 'density'}
