@@ -94,6 +94,7 @@ class Pix2pixDataset(BaseDataset):
                 instance_tensor = instance_tensor.long()
             else:
                 instance_tensor = transform_label(instance)
+            instance_tensor = instance_tensor[:1]
 
         input_dict = {'label': label_tensor,
                       'instance': instance_tensor,

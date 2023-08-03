@@ -69,7 +69,7 @@ class Pix2PixConditionModel(Pix2PixModel):
         if condition is not None:
             condition = condition.to(data_processed[0].device)
             if self.opt.condition_probe:
-                data['condition_probe'] = data['condition_probe'].cuda()
+                data['condition_probe'] = data['condition_probe'].to(data_processed[0].device)
         return list(data_processed[:-1]) + [condition]
 
     def discriminate(self, input_semantics, fake_image, real_image):
