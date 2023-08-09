@@ -125,7 +125,7 @@ class Pix2PixConditionModel(Pix2PixModel):
 
         # condition probing
         if self.opt.condition_probe and self.opt.condition_size:
-            fake_image_probe, _, _ = self.generate_fake(input_semantics, None, condition_probe)
+            fake_image_probe, _, _ = self.generate_fake(input_semantics, None, condition=condition_probe)
             patch_probe_fake, condition_probe_fake, _, _ = self.discriminate(input_semantics, fake_image_probe, real_image)
             G_losses['GAN_probe'] = self.criterionGAN(patch_probe_fake, True, for_discriminator=True)
             G_losses['G_attr_probe'] = torch.mean(self.opt.lambda_attr * self.condition_weight *
