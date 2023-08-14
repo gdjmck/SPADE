@@ -19,19 +19,7 @@ class Pix2PixConditionModel(Pix2PixModel):
         if opt.isTrain and opt.diff_aug:
             self.policy = 'color,translation,cutout'
         if opt.condition_size:
-            # 条件顺序：[地块大小, 平均层数, 密度, 楼栋数, 容积率]
-            # 条件优先级：[容积率, 密度, 平均层数, 楼栋数, 地块大小]
-            mask = [1] * 5
-            if opt.condition_size < 5:
-                mask[0] = 0
-            if opt.condition_size < 4:
-                mask[3] = 0
-            if opt.condition_size < 3:
-                mask[1] = 0
-            if opt.condition_size < 2:
-                mask[2] = 0
-            weight = np.array([1.0, 10.0, 10.0, 2.0, 10.0], dtype=float)[np.where(mask)]
-            self.condition_weight = self.FloatTensor([weight.tolist()])
+            self.condition_weight = self.FloatTensor([[1.0] * opt.condition_size])
 
     def initialize_networks(self, opt):
         super(Pix2PixConditionModel, self).initialize_networks(opt)
