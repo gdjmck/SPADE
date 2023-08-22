@@ -17,6 +17,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--no_html', action='store_true', help='do not save intermediate training results to [opt.checkpoints_dir]/[opt.name]/web/')
         parser.add_argument('--debug', action='store_true', help='only do one epoch and displays at each iteration')
         parser.add_argument('--tf_log', action='store_true', help='if specified, use tensorboard logging. Requires tensorflow installed')
+        parser.add_argument('--profile', action='store_true', help='turn on profile for every op in one training loop')
 
         # for training
         parser.add_argument('--continue_train', action='store_true', help='continue training: load the latest model')

@@ -15,6 +15,11 @@ from trainers.pix2pix_trainer import Pix2PixTrainer
 # parse options
 opt = TrainOptions().parse()
 
+if opt.profile:
+    import cProfile, pstats, io
+    from pstats import SortKey
+    pr = cProfile.Profile()
+
 # print options to help debugging
 print(' '.join(sys.argv))
 
@@ -35,6 +40,8 @@ for epoch in iter_counter.training_epochs():
     iter_counter.record_epoch_start(epoch)
     if epoch > 1:
         dataloader.dataset.condition_history.update_mean_and_stdvar()
+    if opt.profile:
+        pr.enable()
     for i, data_i in enumerate(dataloader, start=iter_counter.epoch_iter):
         iter_counter.record_one_iteration()
 
@@ -80,6 +87,14 @@ for epoch in iter_counter.training_epochs():
               (epoch, iter_counter.total_steps_so_far))
         trainer.save('latest')
         trainer.save(epoch)
+
+    if opt.profile:
+        pr.disable()
+        s = io.StringIO()
+        ps = pstats.Stats(pr, stream=s).sort_stats(SortKey.CUMULATIVE)
+        with open('iter_profile_stats.txt', 'w') as f:
+            f.write(s.getvalue())
+        break
 
 trainer.summary_writer.close()
 print('Training was successfully finished.')
