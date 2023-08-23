@@ -8,6 +8,7 @@ import os
 import json
 
 DEBUG = False
+condition_history = {}
 
 def probe(val, stdvar, max_range: float=0.1):
     seed = random.randint(1, 10) / 10
@@ -19,7 +20,6 @@ class Condition:
 
     def __init__(self, opt):
         self.opt = opt
-        self.condition_dict = {}
         self.condition_size = opt.condition_size
         # 所有条件label必须在condition_dict中
         assert all([c in Condition.condition_dict for c in list(opt.condition_order)])
@@ -76,8 +76,8 @@ class Condition:
         """
         根据已记录在案的数据计算均值与标准差
         """
-        data = np.empty((len(self.condition_dict), self.condition_size), dtype=np.float32)
-        for i, condition in enumerate(self.condition_dict.values()):
+        data = np.empty((len(condition_history), self.condition_size), dtype=np.float32)
+        for i, condition in enumerate(condition_history.values()):
             data[i] = np.array(condition) * self.condition_stdvar + self.condition_mean
 
         # print('旧均值:{}\n旧标准差为:{}'.format(self.condition_mean.tolist(),
@@ -293,8 +293,8 @@ class Condition:
         """
         if not os.path.exists(file):
             return 0
-        elif file in self.condition_dict:
-            return self.condition_dict[file]
+        elif file in condition_history:
+            return condition_history[file]
         else:
             # 生成并记录
             condition = None
@@ -304,7 +304,7 @@ class Condition:
                 condition = self.cal_condition(file)
             # z-score
             condition = (np.array(condition) - self.condition_mean) / self.condition_stdvar
-            self.condition_dict[file] = condition
+            condition_history[file] = condition
             return condition
 
     def read_condition(self, input_list):
