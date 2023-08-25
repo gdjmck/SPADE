@@ -75,27 +75,6 @@ class DataPrep:
         return {'label': label_tensor, 'vr': vr, 'image': self.vae_ref}
 
 
-# Load model into memory
-epoch = 3000
-vae_ref = r'd:\Documents\aisr\GeosRelate\dataset_style3_slim\VolRatio\35_70\arch_GZ\27.jpg'
-opt_pickle = './checkpoints/remote/arch_layout_ngf32_volrate/opt.pkl'
-opt = EvalOptions(opt_pickle).parse()
-opt.num_upsampling_layers = 'normal'
-opt.continue_train = False
-opt.which_epoch = epoch
-opt.checkpoints_dir = './checkpoints/remote'
-print(opt)
-
-# vae_ref
-processor = DataPrep(vae_ref)
-
-# create model
-model = Pix2PixModel(opt)
-# model = UNetModel(opt)
-model.cuda()
-model.eval()
-
-
 
 urls = (
     '/generateLayout', 'GenerateLayout',
@@ -323,6 +302,26 @@ class GenerateLayout:
 
 
 if __name__ == '__main__':
+    # Load model into memory
+    epoch = 3000
+    vae_ref = r'd:\Documents\aisr\GeosRelate\dataset_style3_slim\VolRatio\35_70\arch_GZ\27.jpg'
+    opt_pickle = './checkpoints/remote/arch_layout_ngf32_volrate/opt.pkl'
+    opt = EvalOptions(opt_pickle).parse()
+    opt.num_upsampling_layers = 'normal'
+    opt.continue_train = False
+    opt.which_epoch = epoch
+    opt.checkpoints_dir = './checkpoints/remote'
+    print(opt)
+
+    # vae_ref
+    processor = DataPrep(vae_ref)
+
+    # create model
+    model = Pix2PixModel(opt)
+    # model = UNetModel(opt)
+    model.cuda()
+    model.eval()
+
     app.run(port=8088)
 
     # # process an field image
