@@ -293,11 +293,16 @@ class UNetGenerator(BaseNetwork):
         self.condition_size = opt.condition_size  # default: 5
         self.down_seq = []
         self.up_seq = []  # 最后做reverse
-        norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_G)
+        # norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_G)
         # UNet最外层
         self.down_seq.append(self.downconv(opt.input_nc, self.ngf, 'outer', norm_layer=norm_layer))
-        self.up_seq.append(self.upconv(2 * self.ngf, opt.output_nc, 'outer', norm_layer=norm_layer))
-        norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_G)
+        self.up_seq.append(nn.Sequential(
+            self.upconv(2 * self.ngf, self.ngf, 'outer', norm_layer=norm_layer),
+            nn.BatchNorm2d(self.ngf),
+            nn.LeakyReLU(),
+            nn.Conv2d(self.ngf, opt.output_nc, kernel_size=1, padding=0)
+        ))
+        # norm_layer = get_nonspade_norm_layer(self.opt, self.opt.norm_G)
         # UNet中间层（特征深度有变化）
         for i in range(3):
             # outer_nc = ngf; inner_nc = 2*ngf; input_nc = ngf
@@ -356,16 +361,13 @@ class UNetGenerator(BaseNetwork):
         return x
 
     def downconv(self, in_nc: int, out_nc: int, down_type: str, norm_layer=nn.BatchNorm2d):
-        # set use_bias
-        if type(norm_layer) == functools.partial:
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
         # use_bias on
         use_bias = True
 
-        down = [norm_layer(nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias)),
-                norm_layer(nn.Conv2d(out_nc, out_nc, kernel_size=1, stride=1, padding=0))]
+        down = [nn.Conv2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias),
+                norm_layer(out_nc),
+                nn.Conv2d(out_nc, out_nc, kernel_size=1, stride=1, padding=0),
+                norm_layer(out_nc)]
         if down_type == 'inner':
             # down_seq = []
             # for i, down_op in enumerate(down):
@@ -389,22 +391,20 @@ class UNetGenerator(BaseNetwork):
         return nn.Sequential(*down)
 
     def upconv(self, in_nc: int, out_nc: int, up_type: str, norm_layer=nn.BatchNorm2d):
-        # set use_bias
-        if type(norm_layer) == functools.partial:
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
         # use_bias on
         use_bias = True
 
-        up = [norm_layer(nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias))]
+        up = [nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1, bias=use_bias),
+              norm_layer(out_nc)]
         if up_type in ['inner', 'middle']:
             up = up + [nn.LeakyReLU(0.2)]
         else:  # up_type == 'outer'
             # 修改最外层输出卷积操作
-            up = [norm_layer(nn.ConvTranspose2d(in_nc, in_nc//2, kernel_size=4, stride=2, padding=1, bias=use_bias)),
+            up = [nn.ConvTranspose2d(in_nc, in_nc//2, kernel_size=4, stride=2, padding=1, bias=use_bias),
+                  norm_layer(in_nc//2),
                   nn.LeakyReLU(0.2),
-                  norm_layer(nn.Conv2d(in_nc//2, out_nc, kernel_size=1, stride=1, padding=0, bias=False))]
+                  nn.Conv2d(in_nc//2, out_nc, kernel_size=1, stride=1, padding=0, bias=False),
+                  norm_layer(out_nc)]
             up = up + [nn.Tanh()]
         # # apply spectral_norm
         # if 'spectral' in self.opt.norm_G:
