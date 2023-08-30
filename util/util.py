@@ -13,6 +13,7 @@ import os
 import argparse
 import dill as pickle
 import util.coco
+from torch.linalg import vector_norm
 
 
 def save_obj(obj, name):
@@ -23,6 +24,13 @@ def save_obj(obj, name):
 def load_obj(name):
     with open(name, 'rb') as f:
         return pickle.load(f)
+
+
+def print_norm_hook(name, writer):
+    def print_hook(module, input, output):
+        writer.add_scalar(name, vector_norm(output))
+        # print('norm of {}: {}'.format(name, vector_norm(output)))
+    return print_hook
 
 
 # returns a configuration for creating a generator

@@ -7,6 +7,18 @@ from models.networks.sync_batchnorm import DataParallelWithCallback
 from models.pix2pix_model import Pix2PixModel
 from models import create_model
 from torch.utils.tensorboard import SummaryWriter
+from collections import defaultdict
+from util.util import print_norm_hook
+
+
+class TBWriter:
+    def __init__(self, writer):
+        self.writer = writer
+        self.index = defaultdict(int)
+
+    def add_scalar(self, name, value):
+        self.writer.add_scalar(name, value, self.index[name])
+        self.index[name] += 1
 
 
 class Pix2PixTrainer():
@@ -35,6 +47,18 @@ class Pix2PixTrainer():
 
         # create summary writer
         self.summary_writer = SummaryWriter(log_dir=os.path.join(opt.checkpoints_dir, opt.name), comment='UNet')
+        self.easy_writer = TBWriter(self.summary_writer)
+        if opt.tf_log:
+            self.log_norm()
+
+    def log_norm(self, model_type='G'):
+        if model_type == 'G':
+            if hasattr(self.pix2pix_model, 'netG'):
+                model = self.pix2pix_model.netG
+            else:
+                model = self.pix2pix_model.module.netG
+            for name, module in model.named_modules():
+                module.register_forward_hook(print_norm_hook(name, self.easy_writer))
 
     def log_histogram(self, step_index, model_type='D'):
         if model_type == 'D':

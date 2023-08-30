@@ -119,7 +119,7 @@ class ImageSaver:
             data_field: GeoSeries
         """
 
-        fig = plt.figure(figsize=(10.24, 10.24), dpi=100)  # 1024*1024
+        fig = plt.figure(figsize=(10.24, 10.24), dpi=50)  # 1024*1024
         ax = fig.add_subplot(1, 1, 1)
         plt.axis([0, MAX_SIZE, 0, MAX_SIZE])
         #         plt.axis('auto')
@@ -133,7 +133,7 @@ class ImageSaver:
                 self.plot_build(poly_gs, get_build_color(floor), ax)
 
         ax.set_axis_off()
-        plt.savefig(os.path.join(self.dir_arch if data_build else self.dir_field, "{}.png".format(field_id)), dpi=100,
+        plt.savefig(os.path.join(self.dir_arch if data_build else self.dir_field, "{}.png".format(field_id)), dpi=50,
                     pad_inches=0)
         plt.close()
 
