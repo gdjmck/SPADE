@@ -76,12 +76,20 @@ class ConditionalSPADEResnetBlock(SPADEResnetBlock):
         self.pre_activate = nn.LeakyReLU()
         self.conditioinal_conv = StyledConv(fout, fout, 3, style_dim=opt.z_dim)
 
-    def forward(self, x, seg, cond_vec):
+    def forward(self, x, seg, cond_vec=None):
+        """
+        条件注入可选，当条件为空时，当前模块退化为SPADEResnetBlock
+        :param x:
+        :param seg:
+        :param cond_vec:
+        :return:
+        """
         x_s = self.shortcut(x, seg)
 
         dx = self.conv_0(self.actvn(self.norm_0(x, seg)))
         dx = self.conv_1(self.actvn(self.norm_1(dx, seg)))
-        dx = self.conditioinal_conv(self.pre_activate(dx), cond_vec)
+        if cond_vec is not None:
+            dx = self.conditioinal_conv(self.pre_activate(dx), cond_vec)
 
         out = x_s + dx
 

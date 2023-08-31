@@ -45,6 +45,7 @@ class BaseOptions():
         parser.add_argument('--condition_norm', type=str, default='./config/mean&stdvar.json', help='json file that contains default mean and stdvar value of condition vector')
         parser.add_argument('--volume_rate', action='store_true',
                             help='volume rate of input image as a condition to insert into generator network')
+        parser.add_argument('--inject_num', type=int, default=-1, help='number of position to inject condition vector')
 
         # for setting inputs
         parser.add_argument('--dataroot', type=str, default='./datasets/cityscapes/')

@@ -143,6 +143,12 @@ class SPADEStyleGenerator(SPADEGenerator):
         from models.networks.architecture import ConditionalSPADEResnetBlock as CSPADEResnetBlock
         self.label_encoder = LabelEncoder(opt, 8 if opt.num_upsampling_layers == 'most' else 7)
         self.iter_index = 0
+        # 条件注入位置的个数
+        if opt.inject_num >= 0:
+            self.num_pos_inject_cond = opt.inject_num
+        else:
+            self.num_pos_inject_cond = 8 if opt.num_upsampling_layers == 'most' else 7
+
         nf = opt.ngf
         self.head_0 = CSPADEResnetBlock(16 * nf, 16 * nf, opt)
 
@@ -159,7 +165,10 @@ class SPADEStyleGenerator(SPADEGenerator):
 
     def iter(self, feat):
         self.iter_index += 1
-        return feat[:, self.iter_index-1]
+        if self.iter_index - 1 < self.num_pos_inject_cond:
+            return feat[:, self.iter_index-1]
+        else:
+            return None
 
     def forward(self, input, z, return_gram=False):
         """
