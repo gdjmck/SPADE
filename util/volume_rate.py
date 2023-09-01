@@ -55,9 +55,9 @@ class Condition:
         # 过滤不需要的条件
         self.condition_mean = self.condition_mean[self.condition_mask]
         self.condition_stdvar = self.condition_stdvar[self.condition_mask]
-        self.floor_choice = [1 + i * 3 for i in range(11)]  # 采样层数 [1, 4, 7, ..., 31]
+        self.floor_choice = list(range(1, math.ceil(100 / 3)))
         self.MAX_AREA = 90000
-        self.COLOR_MAP = {i: 200 - i * 20 for i in range(11)}  # 层数与颜色的映射
+        self.COLOR_MAP = {i: 220 - 2 * i for i in range(1, 101)}  # 高度与颜色的映射
         self.STANDARD_SIZE = 512
 
     def reorder(self, condition: np.array):
@@ -93,8 +93,8 @@ class Condition:
         :param floor:
         :return:
         """
-        segment = math.floor(floor / 3)
-        color_range = (self.COLOR_MAP[segment] - 10, self.COLOR_MAP[segment] + 10)
+        height = floor * 3
+        color_range = (self.COLOR_MAP[height], self.COLOR_MAP[height] + 1)
         return ((color_range[0] <= mask_all) & (mask_all < color_range[1])).astype(np.uint8)
 
     def open_op(self, img_mask, kernel_size=3):
