@@ -95,7 +95,8 @@ class UNetModel(Pix2PixModel):
         if mode == 'inference':
             with torch.no_grad():
                 fake_image = self.generate_fake(input_semantics, condition)
-            return fake_image
+                _, condition_fake, _, condition_real = self.discriminate(fake_image, real_image)
+            return fake_image, condition_fake, condition_real
         elif mode == 'generator':
             g_loss, fake_image = self.compute_generator_loss(input_semantics, real_image, condition)
             return g_loss, fake_image
