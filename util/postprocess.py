@@ -272,9 +272,12 @@ def to_geojson(data: dict):
     :return:
     """
     geo = {
-        'geometry': [Polygon(outloop) for outloop in data['outloop']],
-        'floor': data['floor']
+        'geometry': [Polygon(outloop) for outloop in data['outloop']]
     }
+    # key不为geometry的原封存至geo
+    for key, val in data.items():
+        if key != 'outloop':
+            geo[key] = val
 
     s = gpd.GeoDataFrame(geo, crs="EPSG:3857")
     # 定义目标坐标系
