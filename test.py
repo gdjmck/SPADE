@@ -6,7 +6,7 @@ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses
 import os
 import sys
 from collections import OrderedDict
-
+import multiprocessing
 import torch
 import data
 from options.test_options import TestOptions
@@ -24,7 +24,7 @@ try:
     opt = TestOptions().parse()
 except:
     opt = ValidateOptions().parse()
-    opt.isTrain = True
+    opt.isTrain = False
     opt.isValidate = True
     opt.fix_condition = False
 
@@ -53,52 +53,56 @@ webpage = html.HTML(web_dir,
 
 summary_writer = SummaryWriter(log_dir=web_dir, comment='Test')
 
-# test
-condition_on = opt.model == 'pix2pix_condition'
-if condition_on:
-    pre_condition = Condition(opt)
-for i, data_i in enumerate(dataloader):
-    if i * opt.batchSize >= opt.how_many:
-        break
-
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
+    # test
+    condition_on = opt.model != 'pix2pix'
     if condition_on:
-        if opt.fix_condition:
-            # 尝试固定条件
-            data_i['condition'] = torch.Tensor([pre_condition.get(
-                r'd:\Documents\aisr\GeosRelate\dataset_style3_slim\ArrangeMode\ColumnRow\arch_GZ\27.jpg').tolist()]).to(
-                data_i['label'].device)
-        generated, condition_fake, condition_real = model(data_i, mode='inference')
-    else:
-        generated = model(data_i, mode='inference')
+        pre_condition = Condition(opt)
+    for i, data_i in enumerate(dataloader):
+        if i * opt.batchSize >= opt.how_many:
+            break
 
-    img_path = data_i['path']
-    for b in range(generated.shape[0]):
-        print('process image... %s' % img_path[b])
-        visuals = OrderedDict([('input_label', data_i['label'][b]),
-                               ('synthesized_image', generated[b])])
-        visualizer.save_images(webpage, visuals, img_path[b:b + 1])
-        ssim_val = ssim((generated + 1) / 2, (data_i['image'] + 1) / 2, data_range=1, size_average=True)
-        print("SSIM: {}".format(ssim_val))
         if condition_on:
-            gen_image_file = os.path.join(webpage.get_image_dir(), 'synthesized_image',
-                                          img_path[b].rsplit('\\', 1)[1].replace('jpg', 'png'))
-            assert os.path.exists(gen_image_file)
-            condition_of_fake = pre_condition.cal_condition(gen_image_file, False)
-            condition_real = pre_condition.read_condition(condition_real.cpu().numpy())
-            condition_fake = pre_condition.read_condition(condition_fake.cpu().numpy())
-            condition_read = pre_condition.read_condition(data_i['condition'].cpu().numpy())
-            print('真实的条件:{}\n预测真实图片的条件:{}\n预测生成图片的条件:{}\n生成图片的真实条件:{}'.format(
-                condition_read, condition_real, condition_fake, condition_of_fake))
-            for tag, index in zip(pre_condition.condition_name, range(len(pre_condition.condition_name))):
-                summary_writer.add_scalars(main_tag='Condition.{}'.format(tag),
-                                           tag_scalar_dict={'real_read': condition_read[0][index],
-                                                            'real_pred': condition_real[0][index],
-                                                            'fake_read': condition_of_fake[index],
-                                                            'fake_pred': condition_fake[0][index],
-                                                            },
-                                           global_step=i)
-                summary_writer.add_scalar(tag='SSIM', scalar_value=ssim_val,
-                                          global_step=i)
+            if opt.fix_condition:
+                # 尝试固定条件
+                data_i['condition'] = torch.Tensor([pre_condition.get(
+                    r'd:\Documents\aisr\GeosRelate\dataset_style3_slim\ArrangeMode\ColumnRow\arch_GZ\27.jpg').tolist()]).to(
+                    data_i['label'].device)
+            generated, condition_fake, condition_real = model(data_i, mode='inference')
+        else:
+            generated = model(data_i, mode='inference')
 
-webpage.save()
-summary_writer.close()
+        img_path = data_i['path']
+        for b in range(generated.shape[0]):
+            print('process image... %s' % img_path[b])
+            visuals = OrderedDict([('input_label', data_i['label'][b]),
+                                   ('synthesized_image', generated[b])])
+            visualizer.save_images(webpage, visuals, img_path[b:b + 1])
+            ssim_val = ssim((generated + 1) / 2, (data_i['image'] + 1) / 2, data_range=1, size_average=True)
+            print("SSIM: {}".format(ssim_val))
+            if condition_on:
+                gen_image_file = os.path.join(webpage.get_image_dir(), 'synthesized_image',
+                                              img_path[b].rsplit('\\', 1)[1].replace('jpg', 'png'))
+                assert os.path.exists(gen_image_file)
+                condition_of_fake = pre_condition.cal_condition(gen_image_file, False)
+                condition_real = pre_condition.read_condition(condition_real.cpu().numpy())
+                condition_fake = pre_condition.read_condition(condition_fake.cpu().numpy())
+                condition_read = pre_condition.read_condition(data_i['condition'].cpu().numpy())
+                print('真实的条件:{}\n预测真实图片的条件:{}\n预测生成图片的条件:{}\n生成图片的真实条件:{}'.format(
+                    condition_read, condition_real, condition_fake, condition_of_fake))
+                for tag, index in zip(pre_condition.condition_name, range(len(pre_condition.condition_name))):
+                    if index >= opt.condition_size:
+                        break
+                    summary_writer.add_scalars(main_tag='Condition.{}'.format(tag),
+                                               tag_scalar_dict={'real_read': condition_read[0][index],
+                                                                'real_pred': condition_real[0][index],
+                                                                'fake_read': condition_of_fake[index],
+                                                                'fake_pred': condition_fake[0][index],
+                                                                },
+                                               global_step=i)
+                    summary_writer.add_scalar(tag='SSIM', scalar_value=ssim_val,
+                                              global_step=i)
+
+    webpage.save()
+    summary_writer.close()
