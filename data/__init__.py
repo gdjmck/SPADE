@@ -50,6 +50,6 @@ def create_dataloader(opt):
         shuffle=not opt.serial_batches,
         num_workers=int(opt.nThreads),
         drop_last=opt.isTrain,
-        persistent_workers=True
+        persistent_workers=True if int(opt.nThreads) > 1 else False
     )
     return dataloader
