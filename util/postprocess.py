@@ -168,6 +168,8 @@ class PostProcess:
         field_size = (self.field_loop.bounds[2]-self.field_loop.bounds[0],
                       self.field_loop.bounds[3]-self.field_loop.bounds[1])
         scaler = min([s_real / s_gen for s_gen, s_real in zip(field_size, standard_size)], key=lambda v: abs(v-1))
+        if scaler < 1 or scaler > 2:
+            return None
         field_poly = Polygon(self.field_loop)
         bias_dict = {'xoff': real_center[0]-field_poly.centroid.x,
                      'yoff': real_center[1]-field_poly.centroid.y}

@@ -148,10 +148,10 @@ class CondGenerateLayout(GenerateLayout):
                 continue
             # 构造返回数据
             output = self.postprocessor.to_output(real_centers[i], field_size[i], coord2longlat=False)
-            output['name'] = field_names[i]
             if output is None:
                 result.append('后处理失败，请重新生成')
                 continue
+            output['name'] = field_names[i]
             # 转换为geojson
             output = to_geojson(output)
             # 恢复偏移

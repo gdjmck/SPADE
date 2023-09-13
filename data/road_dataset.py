@@ -40,7 +40,7 @@ class RoadDataset(BaseDataset):
             self.data_index_list = json.load(f)['{}_index'.format(opt.phase)]
         assert opt.crop_size % 2 == 0
         self.height = self.width = opt.crop_size
-        self.dataset_size = min(5000, len(self.data_index_list))
+        self.dataset_size = min(opt.max_dataset_size, len(self.data_index_list))
 
     def __len__(self):
         return self.dataset_size
