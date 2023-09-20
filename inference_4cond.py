@@ -30,9 +30,9 @@ pre_condition = Condition(opt)
 processor = DataPrep()
 
 class WebApp(web.application):
-    def run(self, port=7001, *middleware):
+    def run(self, port=opt.port, *middleware):
         func = self.wsgifunc(*middleware)
-        return web.httpserver.runsimple(func, ('10.1.15.61', port))
+        return web.httpserver.runsimple(func, (opt.web_ip, port))
 
 urls = ('/generate', 'CondGenerateLayout')
 app = WebApp(urls, globals())
