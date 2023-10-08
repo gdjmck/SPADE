@@ -65,9 +65,9 @@ class Condition:
         # 过滤不需要的条件
         self.condition_mean = self.condition_mean[self.condition_mask]
         self.condition_stdvar = self.condition_stdvar[self.condition_mask]
-        self.floor_choice = list(range(1, math.ceil(100 / 3)))
         self.MAX_AREA = 90000
         self.COLOR_MAP = {i: 220 - 2 * i for i in range(1, 101)}  # 高度与颜色的映射
+        self.floor_choice = [h//3 for h in self.COLOR_MAP.keys() if h % 3 == 0]
         self.STANDARD_SIZE = 512
 
     def reorder(self, condition: np.array):
@@ -105,6 +105,8 @@ class Condition:
         """
         height = floor * 3
         color_range = (self.COLOR_MAP[height], self.COLOR_MAP[height] + 1)
+        if height == 99:  # 补丁：最高层要cover 100米高度
+            color_range = (self.COLOR_MAP[100], color_range[1])
         return ((color_range[0] <= mask_all) & (mask_all < color_range[1])).astype(np.uint8)
 
     def open_op(self, img_mask, kernel_size=3):
