@@ -58,6 +58,7 @@ class BaseOptions():
         parser.add_argument('--cache_filelist_write', action='store_true', help='saves the current filelist into a text file, so that it loads faster')
         parser.add_argument('--cache_filelist_read', action='store_true', help='reads from the file list cache')
         parser.add_argument('--condition_json', type=str, default='', help='condition json file')
+        parser.add_argument('--field_max_size', type=int, default=300, help='image width or height corresponds to the size in reality')
 
         # for displays
         parser.add_argument('--display_winsize', type=int, default=400, help='display window size')

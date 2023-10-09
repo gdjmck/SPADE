@@ -40,8 +40,15 @@ def open_op(img_mask):
 
 
 class PostProcess:
-    def __init__(self, max_size, tolerance=1.0):
+    def __init__(self, max_size, tolerance=1.0, field_size=300):
+        """
+
+        :param max_size:
+        :param tolerance:
+        :param field_size: 图片对应真实地块的尺寸（米）
+        """
         self.tolerance = tolerance
+        self.field_size = field_size
         self.max_size = max_size  # 用于y轴反转
         self.minBuildArea = 25
         self.segment_to_color = {0: 200,
@@ -72,18 +79,21 @@ class PostProcess:
         self.scale = 0  # 一个像素代表的面积
 
     def color2floor(self, color_val: int):
-        nearest_color_segment = min(self.segment_to_color.keys(),
-                                    key=lambda segment: abs(color_val - self.segment_to_color[segment]))
-        return (nearest_color_segment + 1) * 3
+        # 高度映射颜色 color_val = 220 - 2 * floor
+        # floor height = 3.0
+        return max(1, math.ceil((220 - color_val) / 6))
 
     def set_scale(self):
         h, w = self.img.shape[:2]
         assert h == w
-        self.scale = (300 / h) ** 2
+        self.scale = (self.field_size / h) ** 2
 
     def process(self, img, type='real'):
         """
-
+        从图片解析建筑，得到建筑轮廓与层数（color2floor）
+        结果:
+            轮廓list：self.building_list
+            层数list: self.floor_list
         """
         self.clear()
         self.img = img
