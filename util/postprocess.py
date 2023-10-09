@@ -120,7 +120,8 @@ class PostProcess:
             if cover_area * self.scale < self.minBuildArea:
                 continue
             if self.contain_multiple_object(mask):
-                print('轮廓索引{}包含多个建筑'.format(len(self.building_list)))
+                pass
+                # print('轮廓索引{}包含多个建筑'.format(len(self.building_list)))
 
             self.extract_build(self.mask == i)
 
@@ -151,6 +152,7 @@ class PostProcess:
         loop = self.simplify(loop[0])
         # 楼栋轮廓不能与红线相交
         loop = self.seperate(loop)
+        """
         # 判断楼栋轮廓内是否只有一种楼
         multi_build, colors = self.is_multipart(mask)
         multi_build = False  # 先屏蔽裙楼
@@ -167,6 +169,8 @@ class PostProcess:
             mask_wo_hole = mask2
         else:
             self.add_build(loop, mask=mask)
+        """
+        self.add_build(loop, mask=mask)
 
         return loop
 
