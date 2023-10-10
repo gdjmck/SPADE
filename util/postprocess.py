@@ -40,8 +40,9 @@ def open_op(img_mask):
 
 
 class PostProcess:
-    def __init__(self, max_size, tolerance=1.0):
+    def __init__(self, max_size, tolerance=1.0, field_size=300):
         self.tolerance = tolerance
+        self.field_size = field_size
         self.max_size = max_size  # 用于y轴反转
         self.minBuildArea = 25
         self.segment_to_color = {0: 200,
@@ -110,7 +111,8 @@ class PostProcess:
             if cover_area * self.scale < self.minBuildArea:
                 continue
             if self.contain_multiple_object(mask):
-                print('轮廓索引{}包含多个建筑'.format(len(self.building_list)))
+                pass
+                # print('轮廓索引{}包含多个建筑'.format(len(self.building_list)))
 
             self.extract_build(self.mask == i)
 

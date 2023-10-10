@@ -7,6 +7,10 @@ import numpy as np
 import os
 import json
 
+from shapely import Polygon
+
+from util.postprocess import PostProcess
+
 DEBUG = False
 
 def probe(val, stdvar, max_range: float=0.1):
@@ -48,6 +52,8 @@ class Condition:
         self.reorder_index_list = self.condition_order_mask()
         self.condition_mean = self.reorder(self.condition_mean)
         self.condition_stdvar = self.reorder(self.condition_stdvar)
+        # 后处理模块的解析器
+        self.parser = PostProcess(256, field_size=self.opt.field_max_size)
 
         # 原始json数据计算条件
         self.condition_json = None
@@ -285,6 +291,41 @@ class Condition:
         floor_avg = float(np.mean(floor_list)) if floor_list else 0
 
         condition_array = np.array([field_area, floor_avg, density, num_builds, volume_rate])
+        condition_array = self.reorder(condition_array)
+
+        return condition_array[self.condition_mask].tolist()
+
+
+    def cal_condition(self, file):
+        """
+            后处理图片后解析条件值
+            return:
+                dict('n': 建筑数量, 'v': 容积率, 'd': 密度, 'f': 平均层数, 's': 地块大小)
+        """
+        img = cv2.imread(file)
+        if len(img.shape) == 3:
+            img = img[..., 0]
+        self.parser.process(img, 'fake')
+        # 建筑基底面积列表
+        base_area_lst = [Polygon(build_loop).area for build_loop in self.parser.building_list]
+        # 层数列表
+        floor_lst = self.parser.floor_list
+        # 地块轮廓LineString
+        field_ls = self.parser.field_loop
+
+        # 栋数
+        num_build = len(base_area_lst)
+        # 地块大小
+        field_size = Polygon(field_ls).area
+        assert field_size > 0
+        # 建筑密度
+        density = sum(base_area_lst) / field_size
+        # 容积率
+        volume_rate = sum(map(lambda item: item[0] * item[1], zip(base_area_lst, floor_lst))) / field_size
+        # 平均层数
+        avg_floor = sum(floor_lst) / num_build
+
+        condition_array = np.array([field_size * self.parser.scale, avg_floor, density, num_build, volume_rate])
         condition_array = self.reorder(condition_array)
 
         return condition_array[self.condition_mask].tolist()
