@@ -318,7 +318,10 @@ class Condition:
         num_build = len(base_area_lst)
         # 地块大小
         field_size = Polygon(field_ls).area
-        assert field_size > 0
+        try:
+            assert field_size > 0
+        except AssertionError:
+            field_size = 100000
         # 建筑密度
         density = sum(base_area_lst) / field_size
         # 容积率

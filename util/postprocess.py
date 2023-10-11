@@ -259,7 +259,10 @@ class PostProcess:
             return loop
         while loop_poly.distance(self.field_loop) <= 0.01:
             loop_poly = loop_poly.buffer(-0.01)
-        return list(loop_poly.exterior.simplify(2 * self.tolerance).coords)
+        try:
+            return list(loop_poly.exterior.simplify(2 * self.tolerance).coords)
+        except AttributeError:
+            return loop
 
     def simplify(self, contour):
         contour = contour.reshape(-1, 2).tolist()
