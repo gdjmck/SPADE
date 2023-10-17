@@ -18,7 +18,7 @@ from util.geo_util import coord_to_longtitude
 def extract_outloop(img):
     def get_area(pts):
         try:
-            return Polygon(pts).area
+            return Polygon(np.array(pts).reshape(-1, 2)).area
         except ValueError:
             return 0
 
@@ -106,9 +106,13 @@ class PostProcess:
             if i == self.bg_id:
                 continue
             mask = self.mask == i
+            mask_poly = Polygon(np.argwhere(mask))
             cover_area = mask.sum()
             # 过滤面积小于25㎡
             if cover_area * self.scale < self.minBuildArea:
+                continue
+            elif cover_area * self.scale < 200 and mask_poly.distance(self.field_loop) <= 3*self.scale:
+                print('去除靠近地块轮廓的小块')
                 continue
             if self.contain_multiple_object(mask):
                 pass
@@ -249,7 +253,10 @@ class PostProcess:
             return loop
         while loop_poly.distance(self.field_loop) <= 0.01:
             loop_poly = loop_poly.buffer(-0.01)
-        return list(loop_poly.exterior.simplify(2 * self.tolerance).coords)
+        try:
+            return list(loop_poly.exterior.simplify(2 * self.tolerance).coords)
+        except AttributeError:
+            return loop
 
     def simplify(self, contour):
         contour = contour.reshape(-1, 2).tolist()

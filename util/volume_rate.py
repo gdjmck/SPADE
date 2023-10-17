@@ -261,39 +261,39 @@ class Condition:
             return False
 
 
-    def cal_condition(self, file, real_flag=True):
-        """
-        计算原始条件 [地块大小, 平均建筑层数, 地块密度, 建筑数量, 容积率]
-        """
-        img = cv2.imread(file)
-        if len(img.shape) == 3:
-            img = img[..., 0]
-        if img.shape[0] != self.STANDARD_SIZE:
-            fx = fy = self.STANDARD_SIZE / img.shape[0]
-            img = cv2.resize(img, dsize=None, fx=fx, fy=fy)
-        img, build_info = self.parse_image(img)
-        # 根据解析结果计算容积率
-        field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2))
-        volume_area = 0  # 计容面积
-        cover_area = 0  # 占地面积
-        num_builds = 0  # 建筑数量
-        floor_list = []
-        for floor, outloop_list in build_info.items():
-            floor_list += [floor] * len(outloop_list)
-            num_builds += len(outloop_list)
-            for outloop in outloop_list:
-                outloop_cover = cv2.contourArea(np.array(outloop))
-                volume_area += outloop_cover * floor
-                cover_area += outloop_cover
-
-        volume_rate = volume_area / field_area
-        density = cover_area / field_area
-        floor_avg = float(np.mean(floor_list)) if floor_list else 0
-
-        condition_array = np.array([field_area, floor_avg, density, num_builds, volume_rate])
-        condition_array = self.reorder(condition_array)
-
-        return condition_array[self.condition_mask].tolist()
+    # def cal_condition(self, file, real_flag=True):
+    #     """
+    #     计算原始条件 [地块大小, 平均建筑层数, 地块密度, 建筑数量, 容积率]
+    #     """
+    #     img = cv2.imread(file)
+    #     if len(img.shape) == 3:
+    #         img = img[..., 0]
+    #     if img.shape[0] != self.STANDARD_SIZE:
+    #         fx = fy = self.STANDARD_SIZE / img.shape[0]
+    #         img = cv2.resize(img, dsize=None, fx=fx, fy=fy)
+    #     img, build_info = self.parse_image(img)
+    #     # 根据解析结果计算容积率
+    #     field_area = cv2.contourArea(np.array(self.extract_outloop(img)).reshape(-1, 2))
+    #     volume_area = 0  # 计容面积
+    #     cover_area = 0  # 占地面积
+    #     num_builds = 0  # 建筑数量
+    #     floor_list = []
+    #     for floor, outloop_list in build_info.items():
+    #         floor_list += [floor] * len(outloop_list)
+    #         num_builds += len(outloop_list)
+    #         for outloop in outloop_list:
+    #             outloop_cover = cv2.contourArea(np.array(outloop))
+    #             volume_area += outloop_cover * floor
+    #             cover_area += outloop_cover
+    #
+    #     volume_rate = volume_area / field_area
+    #     density = cover_area / field_area
+    #     floor_avg = float(np.mean(floor_list)) if floor_list else 0
+    #
+    #     condition_array = np.array([field_area, floor_avg, density, num_builds, volume_rate])
+    #     condition_array = self.reorder(condition_array)
+    #
+    #     return condition_array[self.condition_mask].tolist()
 
 
     def cal_condition(self, file):
@@ -368,4 +368,4 @@ if __name__ == '__main__':
     # parse options
     opt = TrainOptions().parse()
     condition_logger = Condition(opt)
-    condition_logger.condition_json
+    condition_logger.cal_condition(r'D:\Documents\aisr\GeosRelate\gen.png')
