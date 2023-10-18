@@ -223,6 +223,8 @@ class NLayerRegressHeadDiscriminator(BaseNetwork):
         self.kw = 4
         self.padw = int(np.ceil((self.kw - 1.0) / 2))
         input_nc = opt.input_nc + opt.label_nc
+        if not opt.no_instance:
+            input_nc += 1
         if opt.contain_dontcare_label:
             input_nc += 1
         sequence = [[nn.Conv2d(input_nc, opt.ndf, kernel_size=self.kw, stride=2, padding=self.padw), nn.LeakyReLU(0.2, True)]]
