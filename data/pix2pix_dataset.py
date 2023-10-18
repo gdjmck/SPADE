@@ -88,7 +88,7 @@ class Pix2pixDataset(BaseDataset):
             instance_tensor = 0
         else:
             instance_path = self.instance_paths[index]
-            instance = Image.open(instance_path)
+            instance = Image.open(instance_path).convert('L')
             if instance.mode == 'L':
                 instance_tensor = transform_label(instance) * 255
                 instance_tensor = instance_tensor.long()
