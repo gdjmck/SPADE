@@ -111,9 +111,9 @@ class PostProcess:
             # 过滤面积小于25㎡
             if cover_area * self.scale < self.minBuildArea:
                 continue
-            elif cover_area * self.scale < 200 and mask_poly.distance(self.field_loop) <= 3*self.scale:
-                print('去除靠近地块轮廓的小块')
-                continue
+            # elif cover_area * self.scale < 200 and mask_poly.distance(self.field_loop) <= 3*self.scale:
+            #     print('去除靠近地块轮廓的小块')
+            #     continue
             if self.contain_multiple_object(mask):
                 pass
                 # print('轮廓索引{}包含多个建筑'.format(len(self.building_list)))
