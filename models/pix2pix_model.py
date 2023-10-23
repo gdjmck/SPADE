@@ -135,18 +135,20 @@ class Pix2PixModel(torch.nn.Module):
         bs, _, h, w = label_map.size()
         nc = self.opt.label_nc + 1 if self.opt.contain_dontcare_label \
             else self.opt.label_nc
-        # try:
-        #     input_label = self.FloatTensor(bs, nc, h, w).zero_()
-        #     input_semantics = input_label.scatter_(1, label_map, 1.0)
-        # except:
-        #     input_semantics = label_map.float()
-        input_semantics = label_map.float()
+        if self.opt.model == 'pix2pix':
+            try:
+                input_label = self.FloatTensor(bs, nc, h, w).zero_()
+                input_semantics = input_label.scatter_(1, label_map, 1.0)
+            except:
+                input_semantics = label_map.float()
+        else:
+            input_semantics = label_map.float()
 
         # concatenate instance map if it exists
         if not self.opt.no_instance:
             inst_map = data['instance']
-            instance_edge_map = self.get_edges(inst_map)
-            input_semantics = torch.cat((input_semantics, instance_edge_map), dim=1)
+            # instance_edge_map = self.get_edges(inst_map)
+            input_semantics = torch.cat((input_semantics, inst_map), dim=1)
 
         return input_semantics, data['image'], data.get('vr', None)
 
