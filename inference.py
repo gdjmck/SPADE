@@ -25,6 +25,8 @@ import random
 import web
 import os
 import requests
+from test_single import WebInterface, preprocess_label_image, preprocess_target_image, \
+    preprocess_condition, load_condition_stat
 
 class EvalOptions(BaseOptions):
     def __init__(self, opt_file):
@@ -74,18 +76,34 @@ class DataPrep:
 
         return {'label': label_tensor, 'vr': vr, 'image': self.vae_ref}
 
+mean, stdvar = load_condition_stat('./config/mean&stdvar.json')
 
+# Load model into memory
+epoch = 3000
+vae_ref = r'd:\Documents\aisr\GeosRelate\dataset_style3_slim\VolRatio\35_70\arch_GZ\27.jpg'
+opt_pickle = './checkpoints/remote/arch_layout_ngf32_volrate/opt.pkl'
+opt = EvalOptions(opt_pickle).parse()
+opt.num_upsampling_layers = 'normal'
+opt.continue_train = False
+opt.which_epoch = epoch
+opt.checkpoints_dir = './checkpoints/remote'
+opt.preprocess_mode = 'scale_width'
+print(opt)
+
+# vae_ref
+processor = DataPrep(vae_ref)
+
+# create model
+model = Pix2PixModel(opt)
+# model = UNetModel(opt)
+model.cuda()
+model.eval()
 
 urls = (
     '/generateLayout', 'GenerateLayout',
+    '/forward', 'SingleShot',
 )
 
-class WebApp(web.application):
-    def run(self, port=8080, *middleware):
-        func = self.wsgifunc(*middleware)
-        return web.httpserver.runsimple(func, ('0.0.0.0', port))
-
-app = WebApp(urls, globals())
 
 class GenerateLayout:
     def __init__(self):
@@ -299,30 +317,47 @@ class GenerateLayout:
         assert len(geo_data) == origin_size
         return json.dumps(geo_data)
 
+class SingleShot:
+    def POST(self):
+        global opt
+        # 输入：轮廓图片+条件信息
+        data = web.input(label='', image='')
 
+        # 条件信息
+        condition = preprocess_condition(json.loads(data['condition']), mean[:1], stdvar[:1])
+
+        # 读取图片
+        # label图片
+        img = WebInterface.convert_binary_to_image(data.label)
+        label_tensor = preprocess_label_image(img.convert('L'), opt)
+        # image
+        img = WebInterface.convert_binary_to_image(data.image)
+        image_tensor = preprocess_target_image(img.convert('RGB'), opt).unsqueeze(0).cuda()
+
+        input_data = {'label': label_tensor.unsqueeze(0).cuda(),
+                      'instance': torch.tensor(0).cuda(),
+                      'image': image_tensor,
+                      'path': '',
+                      'vr': torch.tensor(condition).unsqueeze(0).cuda()
+                      }
+        input_semantics, _, condition = model.preprocess_input(input_data)
+        with torch.no_grad():
+            fake_image, _ = model.generate_fake(input_semantics, image_tensor[:, :1], volume_ratio=condition)
+        gen_image = tensor2im(fake_image)
+        return WebInterface.convert_array_to_binary(gen_image[0])
+
+
+class WebApp(web.application):
+    def run(self, port=8080, *middleware):
+        func = self.wsgifunc(*middleware)
+        return web.httpserver.runsimple(func, ('0.0.0.0', port))
+
+app = WebApp(urls, globals())
 
 if __name__ == '__main__':
-    # Load model into memory
-    epoch = 3000
-    vae_ref = r'd:\Documents\aisr\GeosRelate\dataset_style3_slim\VolRatio\35_70\arch_GZ\27.jpg'
-    opt_pickle = './checkpoints/remote/arch_layout_ngf32_volrate/opt.pkl'
-    opt = EvalOptions(opt_pickle).parse()
-    opt.num_upsampling_layers = 'normal'
-    opt.continue_train = False
-    opt.which_epoch = epoch
-    opt.checkpoints_dir = './checkpoints/remote'
-    print(opt)
 
-    # vae_ref
-    processor = DataPrep(vae_ref)
 
-    # create model
-    model = Pix2PixModel(opt)
-    # model = UNetModel(opt)
-    model.cuda()
-    model.eval()
-
-    app.run(port=8088)
+    app.run(port=7003)
 
     # # process an field image
     # field_files = glob.glob(r'd:\Documents\aisr\GeosRelate\field_ZS\*')
