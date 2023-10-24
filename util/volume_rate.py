@@ -323,7 +323,10 @@ class Condition:
         # 容积率
         volume_rate = sum(map(lambda item: item[0] * item[1], zip(base_area_lst, floor_lst))) / field_size
         # 平均层数
-        avg_floor = sum(floor_lst) / num_build
+        try:
+            avg_floor = sum(floor_lst) / num_build
+        except ZeroDivisionError:
+            avg_floor = 0
 
         condition_array = np.array([field_size * self.parser.scale, avg_floor, density, num_build, volume_rate])
         condition_array = self.reorder(condition_array)
