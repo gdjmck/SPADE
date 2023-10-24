@@ -146,7 +146,7 @@ class Pix2PixModel(torch.nn.Module):
 
         # concatenate instance map if it exists
         if not self.opt.no_instance:
-            inst_map = data['instance']
+            inst_map = data['instance'] / 255
             # instance_edge_map = self.get_edges(inst_map)
             input_semantics = torch.cat((input_semantics, inst_map), dim=1)
 
